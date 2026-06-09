@@ -177,7 +177,7 @@ namespace Eliminated.Sim.Games
             }
         }
 
-        private void BotThink(Actor a)
+        protected override void BotThink(Actor a)
         {
             if (_phase != MinglePhase.Mingle)
             {

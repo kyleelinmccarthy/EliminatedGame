@@ -375,7 +375,7 @@ namespace Eliminated.Sim.Games
                 Id = r.Id, X = r.Pos.X, Y = r.Pos.Y, Spin = r.Spin,
                 Big = r.HitR > BaseHitR * 1.5f, Owner = r.Owner
             }).ToList(),
-            Pickups = _pickups.Select(p => new PickupView
+            Pickups = _pickups.Select(p => new Eliminated.Sim.Powerups.PickupView
             {
                 Id = p.Id, Kind = p.Kind.ToString(), X = p.Pos.X, Y = p.Pos.Y, Bob = p.Bob
             }).ToList()
@@ -474,9 +474,8 @@ namespace Eliminated.Sim.Games
             public int Target;
             public bool Night;
             public List<RangView> Rangs;
-            public List<PickupView> Pickups;
+            public List<Eliminated.Sim.Powerups.PickupView> Pickups;
         }
         public sealed class RangView { public int Id; public float X; public float Y; public float Spin; public bool Big; public string Owner; }
-        public sealed class PickupView { public int Id; public string Kind; public float X; public float Y; public float Bob; }
     }
 }

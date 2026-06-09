@@ -364,7 +364,7 @@ namespace Eliminated.Sim.Games
             return best;
         }
 
-        private void BotThink(Actor a)
+        protected override void BotThink(Actor a)
         {
             var here = IslandUnder(a.Pos);
             bool safeHere = here != null && here.Phase != Phase.Sinking && here.R > Constants.PlayerRadius * 1.4f;
