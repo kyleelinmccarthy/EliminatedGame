@@ -41,6 +41,29 @@ namespace Eliminated.Game.Input
                     _sim.SubmitFor(ids[i], game == GameId.Boomerang ? GameInput.Action("throw") : GameInput.Tap());
                 if (c.Dash) _sim.SubmitFor(ids[i], GameInput.Action("dash"));
                 if (game == GameId.Boomerang && c.HasAim) _sim.SubmitFor(ids[i], GameInput.Aim(c.Aim));
+                if (i == 0) HandleDiscreteChoices(ids[0], game); // keyboard player drives Choose-games
+            }
+        }
+
+        /// <summary>Keyboard → discrete `Choose` inputs for the turn/timing games.</summary>
+        private void HandleDiscreteChoices(string pid, GameId game)
+        {
+            var kb = Keyboard.current;
+            if (kb == null) return;
+            switch (game)
+            {
+                case GameId.GlassBridge:
+                case GameId.ChutesAndLadders:
+                    if (kb.leftArrowKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("L"));
+                    if (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("R"));
+                    break;
+                case GameId.SimonSays:
+                    if (kb.wKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("head"));
+                    if (kb.aKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("nose"));
+                    if (kb.sKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("blink"));
+                    if (kb.dKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("flip"));
+                    if (kb.spaceKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("jump"));
+                    break;
             }
         }
 

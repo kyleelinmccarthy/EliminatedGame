@@ -203,6 +203,19 @@ namespace Eliminated.Game.UI
                     case GameId.RedLight: hint = "Move on GREEN (WASD/Arrows). FREEZE on RED."; break;
                     case GameId.TugOfWar: hint = "MASH Space / Click to pull your team to victory!"; break;
                     case GameId.Boomerang: hint = "Move (WASD) · Aim (mouse) · Throw (Click/Space) · Dash (Shift)"; break;
+                    case GameId.Tag:
+                    case GameId.Dodgeball:
+                    case GameId.Mingle:
+                    case GameId.MusicalChairs:
+                    case GameId.KingOfTheHill:
+                    case GameId.PropHunt:
+                    case GameId.KeepyUppy: hint = "WASD/Arrows move · Space action · Shift dash"; break;
+                    case GameId.GlassBridge: hint = "← / → (or A/D) to step LEFT or RIGHT on your turn."; break;
+                    case GameId.ChutesAndLadders: hint = "SPACE to roll · ← / → to pick a fork."; break;
+                    case GameId.JumpRope: hint = "SPACE / Click to JUMP the rope."; break;
+                    case GameId.SimonSays: hint = "Obey: W=head A=nose S=blink D=flip Space=jump · FREEZE = touch nothing."; break;
+                    case GameId.RpsMinusOne: hint = "RPS duel (bot-assisted in this build)."; break;
+                    case GameId.PresentSwap: hint = "Secret Santa — guessing is bot-assisted in this build."; break;
                 }
             }
             GUI.Label(new Rect(0, h - 36, w, 24), hint, new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
@@ -226,9 +239,63 @@ namespace Eliminated.Game.UI
                     GUI.Label(new Rect(mid - 200, 86, 400, 20), $"Time: {tug.TimeLeft:0.0}s", new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
                     break;
                 case Boomerang.BoomData boom:
-                    GUI.Label(new Rect(w - 180, 56, 170, 24), $"Survive: {boom.Alive}/{boom.Target} · {boom.TimeLeft:0}s", _body);
+                    Info(w, $"Survive: {boom.Alive}/{boom.Target}", $"{boom.TimeLeft:0}s left");
+                    break;
+                case Tag.TagData tag:
+                    Info(w, $"🔵 {tag.FreezersAlive}  🩷 {tag.RunnersAlive}", tag.DeepFreeze ? "DEEP FREEZE!" : $"{tag.TimeLeft:0}s");
+                    break;
+                case Dodgeball.DodgeData dodge:
+                    Info(w, $"Team A {dodge.Team0Alive} — {dodge.Team1Alive} Team B", $"{dodge.TimeLeft:0}s");
+                    break;
+                case KingOfTheHill.KothData koth:
+                    Info(w, $"🌋 Alive: {koth.Alive}", $"{koth.TimeLeft:0}s — the floor is lava!");
+                    break;
+                case MusicalChairs.McData mc:
+                    Info(w, $"🪑 {mc.Phase.ToUpper()} (round {mc.Round})", mc.Fake ? "…PSYCH! keep moving" : $"{mc.TimeLeft:0.0}s");
+                    break;
+                case Mingle.MingleData mingle:
+                    Info(w, mingle.Phase == "Mingle" ? $"GROUP OF {mingle.N}!" : "🫂 Mingle…", $"round {mingle.Round} · {mingle.TimeLeft:0.0}s");
+                    break;
+                case GlassBridge.GlassData glass:
+                    Info(w, $"🪟 Row {glass.Frontier + 1}/{glass.Rows}", glass.Phase == "choose" ? $"{Name(glass.ActiveId)} picks… {glass.TurnTimeLeft:0.0}s" : glass.Phase);
+                    break;
+                case JumpRope.RopeData rope:
+                    Info(w, $"🤸 Swing {rope.Swing}", $"bridge {rope.BridgeLen} planks");
+                    break;
+                case RpsMinusOne.RpsData rps:
+                    Info(w, $"✊ {rps.Phase.ToUpper()}", $"round {rps.Round} · {rps.TimeLeft:0.0}s");
+                    break;
+                case SimonSays.SimonData simon:
+                    if (simon.Command != null)
+                    {
+                        var pc = GUI.color; GUI.color = simon.Freeze ? Color.cyan : Color.yellow;
+                        GUI.Box(new Rect(w / 2f - 200, h * 0.18f, 400, 46),
+                            simon.Freeze ? "🧊 FREEZE — touch nothing!" : $"SIMON SAYS: {simon.Command.ToUpper()}", _pill);
+                        GUI.color = pc;
+                    }
+                    Info(w, $"🎵 Beat {simon.Beat}/{simon.MaxBeats}", "press W/A/S/D/Space");
+                    break;
+                case ChutesAndLadders.ChutesData chutes:
+                    Info(w, "🎲 Race to the top!", $"{chutes.TimeLeft:0}s — Space to roll");
+                    break;
+                case PresentSwap.PresentData present:
+                    Info(w, present.Phase == "gift" ? "🌑 Lights out…" : (present.Phase == "guess" ? "💡 Guess your giver!" : "🎁 Reveal"), $"round {present.Round} · {present.TimeLeft:0.0}s");
+                    break;
+                case PropHunt.PropData prop:
+                    Info(w, prop.Phase == "hide" ? "🫥 Disguise yourself!" : $"🗡️ Found {prop.Found}/{prop.Quota}", $"{prop.HidersLeft} hiding · {prop.TimeLeft:0}s");
+                    break;
+                case KeepyUppy.KeepyData keepy:
+                    Info(w, $"🎈 Alive: {keepy.Alive}", $"{keepy.TimeLeft:0}s — don't let it drop!");
                     break;
             }
+        }
+
+        /// <summary>Top-right two-line status box.</summary>
+        private void Info(float w, string line1, string line2)
+        {
+            GUI.Box(new Rect(w - 270, 48, 260, 50), "");
+            GUI.Label(new Rect(w - 262, 50, 250, 24), line1, _body);
+            GUI.Label(new Rect(w - 262, 72, 250, 22), line2, new GUIStyle(_body) { fontSize = 14 });
         }
 
         private void DrawRoundResult(float w, float h)

@@ -3,6 +3,7 @@ using UnityEngine;
 using Eliminated.Sim.Core;
 using Eliminated.Sim.Games;
 using Eliminated.Sim.Model;
+using Eliminated.Sim.Powerups;
 using Eliminated.Game.Accessibility;
 using Eliminated.Game.SimBridge;
 
@@ -94,29 +95,91 @@ namespace Eliminated.Game.View
             RenderGameProps(snap);
         }
 
+        private static readonly Color YellowRang = new Color(1f, 0.96f, 0.5f);
+        private static readonly Color IslandColor = new Color(0.55f, 0.45f, 0.32f);
+        private static readonly Color LavaColor = new Color(0.9f, 0.25f, 0.05f);
+        private static readonly Color ChairColor = new Color(0.85f, 0.7f, 0.4f);
+        private static readonly Color RoomColor = new Color(0.4f, 0.55f, 0.85f);
+
         private void RenderGameProps(Snapshot snap)
         {
             _propsUsed = 0;
-            if (snap?.Data is Boomerang.BoomData boom)
+            switch (snap?.Data)
             {
-                if (boom.Rangs != null)
-                    foreach (var r in boom.Rangs)
-                        PlaceProp(r.X, r.Y, r.Big ? 30f : 16f, new Color(1f, 0.96f, 0.5f), 0.35f);
-                if (boom.Pickups != null)
-                    foreach (var p in boom.Pickups)
-                        PlaceProp(p.X, p.Y, 22f, Palette.Safe, 0.2f);
+                case Boomerang.BoomData boom:
+                    DrawPickups(boom.Pickups);
+                    if (boom.Rangs != null)
+                        foreach (var r in boom.Rangs) Disc(r.X, r.Y, r.Big ? 30f : 16f, YellowRang, 0.35f);
+                    break;
+
+                case KingOfTheHill.KothData koth:
+                    if (koth.Islands != null)
+                        foreach (var i in koth.Islands)
+                            Disc(i.X, i.Y, i.R, i.Final ? Color.Lerp(IslandColor, Palette.Safe, 0.4f) : IslandColor, 0.02f);
+                    DrawPickups(koth.Pickups);
+                    break;
+
+                case Dodgeball.DodgeData dodge:
+                    Disc(dodge.Mid, 360f, 6f, Color.white, 0.02f); // centerline marker
+                    if (dodge.Balls != null)
+                        foreach (var b in dodge.Balls)
+                            Disc(b.X, b.Y, 15f, b.State == "flight" ? Color.red : YellowRang, 0.3f);
+                    DrawPickups(dodge.Pickups);
+                    break;
+
+                case KeepyUppy.KeepyData keepy:
+                    if (keepy.Balloons != null)
+                        foreach (var b in keepy.Balloons) Disc(b.X, b.Y, 30f, Palette.Body(b.Color), 0.4f);
+                    DrawPickups(keepy.Pickups);
+                    break;
+
+                case MusicalChairs.McData mc:
+                    if (mc.Chairs != null)
+                        foreach (var c in mc.Chairs) Disc(c.X, c.Y, 46f, c.Claimed ? Palette.Safe : ChairColor, 0.05f);
+                    DrawPickups(mc.Pickups);
+                    break;
+
+                case Mingle.MingleData mingle:
+                    Disc(mingle.PlatformX, mingle.PlatformY, mingle.PlatformR, new Color(0.5f, 0.5f, 0.6f), 0.03f);
+                    if (mingle.Rooms != null)
+                        foreach (var r in mingle.Rooms) Disc(r.X, r.Y, r.R, r.Ok ? Palette.Safe : RoomColor, 0.02f);
+                    break;
+
+                case PropHunt.PropData prop:
+                    if (prop.Decoys != null)
+                        foreach (var d in prop.Decoys) Disc(d.X, d.Y, 20f, new Color(0.6f, 0.5f, 0.4f), 0.1f);
+                    break;
+
+                case Tag.TagData tag:
+                    DrawPickups(tag.Pickups);
+                    break;
+
+                case RedLightGreenLight.RlglData rl:
+                    Disc(rl.FinishX, 360f, 10f, rl.Red ? Palette.Danger : Palette.Safe, 0.02f);
+                    break;
             }
             for (int i = _propsUsed; i < _props.Count; i++)
                 if (_props[i].activeSelf) _props[i].SetActive(false);
         }
 
-        private void PlaceProp(float lx, float ly, float logicalRadius, Color color, float height)
+        private void DrawPickups(List<PickupView> pickups)
+        {
+            if (pickups == null) return;
+            foreach (var p in pickups)
+            {
+                bool good = System.Enum.TryParse<PowerupKind>(p.Kind, out var k) && PowerupEffects.IsGood(k);
+                Disc(p.X, p.Y, 18f, Palette.Powerup(good), 0.25f);
+            }
+        }
+
+        /// <summary>Draw a flat disc on the floor (the natural top-down primitive).</summary>
+        private void Disc(float lx, float ly, float logicalRadius, Color color, float height)
         {
             GameObject go;
             if (_propsUsed < _props.Count) go = _props[_propsUsed];
             else
             {
-                go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 Destroy(go.GetComponent<Collider>());
                 go.name = "Prop";
                 go.transform.SetParent(transform, false);
@@ -126,7 +189,7 @@ namespace Eliminated.Game.View
             _propsUsed++;
             if (!go.activeSelf) go.SetActive(true);
             float d = LogicalSpace.WorldRadius(logicalRadius) * 2f;
-            go.transform.localScale = Vector3.one * d;
+            go.transform.localScale = new Vector3(d, 0.04f, d); // a thin disc (default cylinder is 2 units tall)
             go.transform.position = LogicalSpace.ToWorld(lx, ly) + new Vector3(0f, height, 0f);
             ViewMaterials.SetColor(go.GetComponent<Renderer>(), new MaterialPropertyBlock(), color);
         }
