@@ -84,6 +84,26 @@ namespace Eliminated.Sim.Room
                 MinPlayers = 4, RequiresEven = false, Cull = CullStrength.Mid,
                 Factory = ctx => new Mingle(ctx)
             },
+            [GameId.GlassBridge] = new GameMeta
+            {
+                Id = GameId.GlassBridge, Name = "Glass Stepping Stones", Icon = "🪟",
+                MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
+                Factory = ctx => new GlassBridge(ctx)
+            },
+            [GameId.JumpRope] = new GameMeta
+            {
+                Id = GameId.JumpRope, Name = "Killer Jump Rope", Icon = "🤸",
+                MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
+                FinaleCapable = true,
+                Factory = ctx => new JumpRope(ctx)
+            },
+            [GameId.RpsMinusOne] = new GameMeta
+            {
+                Id = GameId.RpsMinusOne, Name = "RPS Minus One", Icon = "✊",
+                MinPlayers = 2, RequiresEven = true, Cull = CullStrength.High,
+                FinaleCapable = true,
+                Factory = ctx => new RpsMinusOne(ctx)
+            },
         };
 
         public static IReadOnlyCollection<GameId> Registered => Meta.Keys;
