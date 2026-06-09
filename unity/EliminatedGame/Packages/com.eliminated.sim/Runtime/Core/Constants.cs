@@ -45,6 +45,10 @@ namespace Eliminated.Sim.Core
         public const int EmptyGraceMs = 30000;
         public const int HeartbeatMs = 30000;
 
+        // ── Night mode vision (units) ────────────────────────────────────
+        public const float NightBaseVision = 250f;
+        public const float NightLanternBonus = 320f;
+
         // ── Currency ─────────────────────────────────────────────────────
         public const string Currency = "Marbles";
         public const string CurrencyIcon = "◍";
