@@ -51,6 +51,20 @@ namespace Eliminated.Sim.Room
                 FinaleCapable = true, Nightable = true,
                 Factory = ctx => new Boomerang(ctx)
             },
+            [GameId.Tag] = new GameMeta
+            {
+                Id = GameId.Tag, Name = "Freeze Tag", Icon = "❄️",
+                MinPlayers = 2, RequiresEven = true, Cull = CullStrength.Mid,
+                Nightable = true,
+                Factory = ctx => new Tag(ctx)
+            },
+            [GameId.KingOfTheHill] = new GameMeta
+            {
+                Id = GameId.KingOfTheHill, Name = "King of the Lava Islands", Icon = "🌋",
+                MinPlayers = 2, RequiresEven = false, Cull = CullStrength.High,
+                Finale = true, FinaleCapable = true, Nightable = true,
+                Factory = ctx => new KingOfTheHill(ctx)
+            },
         };
 
         public static IReadOnlyCollection<GameId> Registered => Meta.Keys;

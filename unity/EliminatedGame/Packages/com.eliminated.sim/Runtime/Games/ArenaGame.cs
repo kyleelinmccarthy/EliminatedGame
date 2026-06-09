@@ -27,8 +27,8 @@ namespace Eliminated.Sim.Games
         protected virtual float MoveSpeed => Constants.PlayerSpeed; // 240
         protected virtual float DashCooldown => 1.4f;
         protected virtual float DashIFrames => 0f;
+        protected virtual float DashSpeedMul => 3.1f;
         protected const float DashDuration = 0.18f;
-        protected const float DashSpeedMul = 3.1f;
         private const float DizzyFreq = 8f;
         private const float DizzyAmp = 0.8f;
 
