@@ -30,6 +30,10 @@ namespace Eliminated.Game.View
             _body = body.transform;
             _bodyRenderer = body.GetComponent<Renderer>();
             _bodyRenderer.sharedMaterial = ViewMaterials.Shared;
+            // Use the generated blob model (Resources/Models/blob.obj) if present,
+            // else keep the primitive sphere.
+            var blob = LoadBlobMesh();
+            if (blob != null) body.GetComponent<MeshFilter>().sharedMesh = blob;
 
             var nose = GameObject.CreatePrimitive(PrimitiveType.Cube);
             Object.Destroy(nose.GetComponent<Collider>());
@@ -80,6 +84,21 @@ namespace Eliminated.Game.View
         public void Destroy()
         {
             if (Root != null) Object.Destroy(Root);
+        }
+
+        private static Mesh _blobMesh;
+        private static bool _blobTried;
+        private static Mesh LoadBlobMesh()
+        {
+            if (_blobTried) return _blobMesh;
+            _blobTried = true;
+            var go = Resources.Load<GameObject>("Models/blob");
+            if (go != null)
+            {
+                var mf = go.GetComponentInChildren<MeshFilter>();
+                if (mf != null) _blobMesh = mf.sharedMesh;
+            }
+            return _blobMesh;
         }
     }
 }

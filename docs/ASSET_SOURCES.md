@@ -36,6 +36,21 @@ Attribution required by a license is reproduced here *and* in the in-game Credit
 |---|---|---|---|---|
 | _(none yet — placeholders/primitives in use)_ | — | — | — | — |
 
+## Generated 3D model (shipped — our own output, no third-party license)
+
+A blob character mesh is produced by **`tools/ModelGen`** as a Wavefront OBJ
+(`unity/EliminatedGame/Assets/Eliminated/Resources/Models/blob.obj`, Git LFS;
+825 verts / 1536 faces) and used by `BlobView` in place of the primitive sphere
+(falls back to the sphere if absent). Regenerate:
+
+```bash
+dotnet run --project tools/ModelGen -- unity/EliminatedGame/Assets/Eliminated/Resources/Models
+```
+
+Our own procedural geometry (no license). Richer character models + animations
+are sourced from the approved sites (Blendswap/TurboSquid/Asset Store) in Phase 7
+and recorded in the ledger above.
+
 ## Generated arena art (shipped — our own output, no third-party license)
 
 6 themed arena floor textures (256×256 32-bit TGA) are produced by **`tools/ArtGen`**
