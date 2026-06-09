@@ -1,0 +1,12 @@
+{
+  "name": "com.eliminated.sim",
+  "version": "0.1.0",
+  "displayName": "Eliminated Simulation",
+  "description": "Pure C# authoritative game simulation for ELIMINATED. No UnityEngine dependency; compiled by both Unity and the .NET SDK (dotnet test).",
+  "unity": "6000.0",
+  "author": {
+    "name": "Kylee Lin McCarthy"
+  },
+  "license": "Proprietary",
+  "hideInEditor": false
+}

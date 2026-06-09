@@ -1,0 +1,24 @@
+ELIMINATED — Proprietary Software License
+Copyright (c) 2026 Kylee Lin McCarthy. All rights reserved.
+
+This repository contains the source code and project files for the video game
+"ELIMINATED" (the "Software"). The Software is proprietary and confidential.
+
+1. No license is granted to copy, modify, distribute, publicly perform, sell,
+   sublicense, or create derivative works of the Software, in whole or in part,
+   except as expressly authorized in writing by the copyright holder.
+
+2. THIRD-PARTY ASSETS. Art, audio, fonts, and other media assets included in or
+   referenced by this repository may be governed by their own separate licenses
+   (e.g. CC0, CC-BY, OFL, or commercial asset-store EULAs). Those assets remain
+   under their respective licenses and are NOT covered by this proprietary
+   license. Every third-party asset, its source, and its license is tracked in
+   docs/ASSET_SOURCES.md. When a third-party license requires attribution, that
+   attribution is reproduced in-game (Credits) and in docs/ASSET_SOURCES.md.
+
+3. THIRD-PARTY CODE. Open-source libraries and packages consumed by the Software
+   (e.g. Unity packages, Facepunch.Steamworks) remain under their own licenses.
+
+4. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+   CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.

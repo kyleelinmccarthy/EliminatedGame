@@ -1,0 +1,50 @@
+# Normalize line endings for text/source
+* text=auto
+
+# C# / config as text
+*.cs        text diff=csharp
+*.csproj    text
+*.sln       text eol=crlf
+*.json      text
+*.md        text
+*.yml       text
+*.yaml      text
+*.asmdef    text
+*.asmref    text
+
+# ───────────── Git LFS: binary game assets ─────────────
+# 3D models
+*.fbx       filter=lfs diff=lfs merge=lfs -text
+*.obj       filter=lfs diff=lfs merge=lfs -text
+*.blend     filter=lfs diff=lfs merge=lfs -text
+*.gltf      filter=lfs diff=lfs merge=lfs -text
+*.glb       filter=lfs diff=lfs merge=lfs -text
+# Textures / images
+*.png       filter=lfs diff=lfs merge=lfs -text
+*.jpg       filter=lfs diff=lfs merge=lfs -text
+*.jpeg      filter=lfs diff=lfs merge=lfs -text
+*.tga       filter=lfs diff=lfs merge=lfs -text
+*.psd       filter=lfs diff=lfs merge=lfs -text
+*.exr       filter=lfs diff=lfs merge=lfs -text
+*.hdr       filter=lfs diff=lfs merge=lfs -text
+# Audio
+*.wav       filter=lfs diff=lfs merge=lfs -text
+*.ogg       filter=lfs diff=lfs merge=lfs -text
+*.mp3       filter=lfs diff=lfs merge=lfs -text
+*.aiff      filter=lfs diff=lfs merge=lfs -text
+# Fonts / video / archives
+*.ttf       filter=lfs diff=lfs merge=lfs -text
+*.otf       filter=lfs diff=lfs merge=lfs -text
+*.mp4       filter=lfs diff=lfs merge=lfs -text
+*.webm      filter=lfs diff=lfs merge=lfs -text
+*.zip       filter=lfs diff=lfs merge=lfs -text
+
+# Unity YAML assets stay TEXT (Force Text serialization) so they merge/diff.
+# Mark them with merge=unityyamlmerge for Unity's Smart Merge tool.
+*.unity     text merge=unityyamlmerge eol=lf
+*.prefab    text merge=unityyamlmerge eol=lf
+*.asset     text merge=unityyamlmerge eol=lf
+*.mat       text merge=unityyamlmerge eol=lf
+*.anim      text merge=unityyamlmerge eol=lf
+*.controller text merge=unityyamlmerge eol=lf
+*.meta      text merge=unityyamlmerge eol=lf

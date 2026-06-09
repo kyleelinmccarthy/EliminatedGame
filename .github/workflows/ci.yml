@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sim-tests:
+    name: Simulation tests (headless)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore sim/Eliminated.sln
+
+      - name: Build
+        run: dotnet build sim/Eliminated.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test sim/Eliminated.sln --configuration Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: ignore
+
+  # Unity build/test (Phase 2+) — wired up with GameCI once the client and a
+  # Unity license secret are in place. Left documented here as the next CI step.
+  # unity-tests:
+  #   name: Unity EditMode/PlayMode tests
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with: { lfs: true }
+  #     - uses: game-ci/unity-test-runner@v4
+  #       env:
+  #         UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  #       with:
+  #         projectPath: unity/EliminatedGame
+  #         testMode: all

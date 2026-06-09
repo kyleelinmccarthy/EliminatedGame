@@ -1,0 +1,16 @@
+{
+  "name": "Eliminated.Game",
+  "rootNamespace": "Eliminated.Game",
+  "references": [
+    "Eliminated.Sim"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

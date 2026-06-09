@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless build of the ELIMINATED simulation.
+    The CANONICAL source lives in the Unity package so there is exactly one copy:
+      unity/EliminatedGame/Packages/com.eliminated.sim/Runtime/**/*.cs
+    Unity compiles those files via Eliminated.Sim.asmdef; this project compiles
+    the same files with the .NET SDK so we can run xUnit tests headlessly (TDD).
+    Target netstandard2.1 to match Unity's API profile and catch incompatible API
+    use at build time.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Eliminated.Sim</RootNamespace>
+    <!-- We provide an explicit Compile glob below; turn off default *.cs globbing
+         (there are no .cs files in this project folder itself). -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\unity\EliminatedGame\Packages\com.eliminated.sim\Runtime\**\*.cs"
+             LinkBase="SimRuntime" />
+  </ItemGroup>
+
+</Project>

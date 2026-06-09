@@ -1,0 +1,57 @@
+# ───────────────────────────── Unity ─────────────────────────────
+# Generated folders (never commit)
+unity/EliminatedGame/[Ll]ibrary/
+unity/EliminatedGame/[Tt]emp/
+unity/EliminatedGame/[Oo]bj/
+unity/EliminatedGame/[Bb]uild/
+unity/EliminatedGame/[Bb]uilds/
+unity/EliminatedGame/[Ll]ogs/
+unity/EliminatedGame/[Uu]ser[Ss]ettings/
+unity/EliminatedGame/[Mm]emoryCaptures/
+unity/EliminatedGame/[Rr]ecordings/
+unity/EliminatedGame/.vsconfig
+
+# Asset meta files for ignored folders / crash reports
+unity/EliminatedGame/sysinfo.txt
+unity/EliminatedGame/*.stackdump
+
+# Unity-generated solution / project files
+*.csproj.user
+*.unityproj
+*.sln.docstates
+
+# ───────────────────────────── .NET ──────────────────────────────
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+.vs/
+.idea/
+*.suo
+TestResults/
+
+# Keep our hand-authored csproj/sln; ignore only generated ones if any
+# (Unity regenerates Assembly-CSharp*.csproj — those live under unity/ and are covered above)
+
+# ───────────────────────────── Tooling ───────────────────────────
+node_modules/
+.dotnet/
+dotnet-install.sh
+
+# ───────────────────────────── OS / Editor ───────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+
+# ───────────────────────────── Secrets ───────────────────────────
+*.env
+.env.local
+secrets/
+**/steam_appid.txt
+
+# ───────────────────────────── Tooling state ─────────────────────
+# Local Claude Code settings (machine-specific; not shared)
+.claude/settings.local.json
