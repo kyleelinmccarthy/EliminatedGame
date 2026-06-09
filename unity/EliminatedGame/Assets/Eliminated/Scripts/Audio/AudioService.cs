@@ -50,6 +50,7 @@ namespace Eliminated.Game.Audio
         // generated WAVs. Both go through Play() so swapping is one line each.
         private static readonly Dictionary<string, string> Sourced = new Dictionary<string, string>
         {
+            { "music", "oga/casual_8bit" }, // real CC-BY loop (Kat) — see oga/LICENSE.txt
             { "shatter", "oga/glass_01" },
             { "chime", "oga/bell_02" },
             { "drum", "oga/slam_03" },

@@ -386,7 +386,10 @@ namespace Eliminated.Game.UI
             s.masterVolume = GUI.HorizontalSlider(new Rect(x, y, 440, 24), s.masterVolume, 0f, 1f);
             AudioListener.volume = s.masterVolume; y += 50;
 
-            GUI.Label(new Rect(x, y, 440, 24), "Controls are remappable in a later build (accessibility).", new GUIStyle(_body) { fontSize = 14 }); y += 40;
+            GUI.Label(new Rect(x, y, 440, 24), "Controls are remappable in a later build (accessibility).", new GUIStyle(_body) { fontSize = 14 }); y += 28;
+            GUI.Label(new Rect(x, y, 440, 36),
+                "Credits: SFX by rubberduck (CC0) · models by Kenney (CC0) · music\n\"Casual 8-Bit\" by Kat (CC-BY 4.0) — all via OpenGameArt.",
+                new GUIStyle(_body) { fontSize = 13 }); y += 44;
 
             if (GUI.Button(new Rect(x, y, 440, 44), Loc.Get("ui.save_and_back")))
             {

@@ -8,3 +8,13 @@ Source: https://opengameart.org/content/100-cc0-sfx
 File:   https://opengameart.org/sites/default/files/100-CC0-SFX_0.zip
 
 These .ogg files are a curated subset used by AudioService for impact/UI cues.
+
+------------------------------------------------------------------
+MUSIC (separate asset, different license)
+
+File:    casual_8bit.wav
+Track:   "Casual Classic Loop (8-Bit)"
+Author:  Kat
+License: CC-BY 4.0 (attribution REQUIRED — credited in-game Credits + here)
+Source:  https://opengameart.org/content/casual-classic-loop-8-bit
+URL:     https://opengameart.org/sites/default/files/Casual%208-bit.wav
