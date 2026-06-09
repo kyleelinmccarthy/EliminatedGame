@@ -216,6 +216,70 @@ namespace Eliminated.Sim.Games
                 MathUtil.Clamp(pos.Y, r, Constants.ArenaH - r));
         }
 
+        /// <summary>
+        /// Integrate movement at a caller-supplied speed multiplier (no powerup
+        /// status / base dash applied). For games that manage their own combat
+        /// dash and speed buffs (e.g. Boomerang). Mirrors the reference
+        /// moveActor(a, dt, mul).
+        /// </summary>
+        protected void MoveAt(Actor a, float dt, float speedMul)
+        {
+            var dir = new Vec2(a.InDx, a.InDy).ClampMagnitude(1f);
+            float speed = MoveSpeed * speedMul;
+            var vel = dir * speed;
+            a.Vel = vel;
+            float r = a.Radius;
+            var pos = a.Pos + vel * dt;
+            a.Pos = new Vec2(
+                MathUtil.Clamp(pos.X, r, Constants.ArenaW - r),
+                MathUtil.Clamp(pos.Y, r, Constants.ArenaH - r));
+            if (dir.SqrLength > 0.0025f)
+            {
+                a.Facing = (float)Math.Atan2(dir.Y, dir.X);
+                a.Anim = AnimState.Run;
+            }
+            else
+            {
+                a.Anim = AnimState.Idle;
+            }
+        }
+
+        /// <summary>
+        /// Build a result where, in a finale (<paramref name="forceSingle"/>),
+        /// the best survivor is crowned and any co-survivors are demoted to
+        /// just-eliminated with <paramref name="demoteNote"/>. Otherwise all
+        /// survivors place by the given best-first order. Eliminated follow in
+        /// reverse elimination order. Reusable by finale-capable games.
+        /// </summary>
+        protected RoundResult CrownResult(IEnumerable<Actor> survivorsBestFirst,
+            bool forceSingle, string demoteNote)
+        {
+            var survivors = survivorsBestFirst.ToList();
+            var res = new RoundResult { Game = Id };
+            int place = 1;
+
+            if (forceSingle && survivors.Count > 1)
+            {
+                res.Ranking.Add(new RankEntry(survivors[0].Id, place++, true, Note(survivors[0].Id)));
+                res.SurvivorIds.Add(survivors[0].Id);
+                for (int i = 1; i < survivors.Count; i++)
+                    res.Ranking.Add(new RankEntry(survivors[i].Id, place++, false, demoteNote));
+            }
+            else
+            {
+                foreach (var a in survivors)
+                {
+                    res.Ranking.Add(new RankEntry(a.Id, place++, true, Note(a.Id)));
+                    res.SurvivorIds.Add(a.Id);
+                }
+            }
+
+            for (int i = _elimOrder.Count - 1; i >= 0; i--)
+                res.Ranking.Add(new RankEntry(_elimOrder[i], place++, false, Note(_elimOrder[i])));
+
+            return res;
+        }
+
         /// <summary>Applies control-inverting curses (reverse, dizzy) to raw input.</summary>
         protected (float, float) ResolveInput(Actor a)
         {

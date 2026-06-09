@@ -30,6 +30,19 @@ namespace Eliminated.Sim.Model
         public List<RankEntry> Ranking = new List<RankEntry>();
     }
 
+    /// <summary>
+    /// Room-level outcome of a round: the minigame ranking plus the marbles the
+    /// room awarded each participant and the round number. (RankEntry already
+    /// carries marbles; this adds round context for the results screen.)
+    /// </summary>
+    public sealed class RoundReport
+    {
+        public GameId Game;
+        public int RoundNumber;
+        public List<RankEntry> Entries = new List<RankEntry>();
+        public List<string> SurvivorIds = new List<string>();
+    }
+
     /// <summary>One player's final position in the series.</summary>
     public sealed class SeriesStanding
     {

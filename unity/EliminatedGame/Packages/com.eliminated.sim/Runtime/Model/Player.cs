@@ -27,6 +27,7 @@ namespace Eliminated.Sim.Model
         public int Score;           // casual points across rounds
         public int RoundsSurvived;
         public int MarblesEarned;   // accumulated this series
+        public string Title;        // bragging-rights title awarded at series end
 
         public Player() { }
 
