@@ -110,6 +110,33 @@ namespace Eliminated.Sim.Room
                 MinPlayers = 4, RequiresEven = false, Cull = CullStrength.Mid,
                 Factory = ctx => new PresentSwap(ctx)
             },
+            // ── Extras (secondary rotation) ──────────────────────────────
+            [GameId.PropHunt] = new GameMeta
+            {
+                Id = GameId.PropHunt, Name = "Prop Hunt", Icon = "🪑",
+                MinPlayers = 3, RequiresEven = false, Cull = CullStrength.Mid, Nightable = true,
+                Factory = ctx => new PropHunt(ctx)
+            },
+            [GameId.KeepyUppy] = new GameMeta
+            {
+                Id = GameId.KeepyUppy, Name = "Keepy Uppy", Icon = "🎈",
+                MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
+                FinaleCapable = true, Nightable = true,
+                Factory = ctx => new KeepyUppy(ctx)
+            },
+            [GameId.ChutesAndLadders] = new GameMeta
+            {
+                Id = GameId.ChutesAndLadders, Name = "Chutes & Ladders", Icon = "🎲",
+                MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
+                Factory = ctx => new ChutesAndLadders(ctx)
+            },
+            [GameId.SimonSays] = new GameMeta
+            {
+                Id = GameId.SimonSays, Name = "Simon Says", Icon = "🎵",
+                MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
+                FinaleCapable = true,
+                Factory = ctx => new SimonSays(ctx)
+            },
         };
 
         public static IReadOnlyCollection<GameId> Registered => Meta.Keys;
