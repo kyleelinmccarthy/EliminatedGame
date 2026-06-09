@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Generates the game's sound effects and a music loop as real 16-bit PCM WAV
+    files (our own procedural output, no third-party license; see
+    docs/ASSET_SOURCES.md). Mirrors the reference game's procedural Web Audio
+    design. Run with: dotnet run then pass an output directory argument.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Eliminated.Tools.SfxGen</RootNamespace>
+  </PropertyGroup>
+
+</Project>

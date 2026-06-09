@@ -5,6 +5,7 @@ using Eliminated.Sim.Games;
 using Eliminated.Sim.Model;
 using Eliminated.Sim.Powerups;
 using Eliminated.Game.Accessibility;
+using Eliminated.Game.Audio;
 using Eliminated.Game.SimBridge;
 
 namespace Eliminated.Game.View
@@ -93,6 +94,32 @@ namespace Eliminated.Game.View
             }
 
             RenderGameProps(snap);
+            PlayFxAudio(snap);
+        }
+
+        // Each snapshot's fx are produced once (the room drains them per tick), so
+        // mapping them to SFX here fires each cue exactly once.
+        private void PlayFxAudio(Snapshot snap)
+        {
+            if (snap?.Fx == null || AudioService.Instance == null) return;
+            foreach (var fx in snap.Fx)
+            {
+                switch (fx.Kind)
+                {
+                    case EffectKind.Death: AudioService.Instance.Play("death"); break;
+                    case EffectKind.Shatter: AudioService.Instance.Play("shatter"); break;
+                    case EffectKind.Pickup: AudioService.Instance.Play("pickup", 0.8f); break;
+                    case EffectKind.Confetti: AudioService.Instance.Play("good", 0.7f); break;
+                    case EffectKind.Ring: AudioService.Instance.Play("chime", 0.6f); break;
+                    case EffectKind.Freeze: AudioService.Instance.Play("catch", 0.7f); break;
+                    case EffectKind.Thaw: AudioService.Instance.Play("pickup", 0.6f); break;
+                    case EffectKind.Throw: AudioService.Instance.Play("throw", 0.6f); break;
+                    case EffectKind.Catch: AudioService.Instance.Play("catch", 0.6f); break;
+                    case EffectKind.Shove: AudioService.Instance.Play("drum", 0.7f); break;
+                    case EffectKind.Burn: AudioService.Instance.Play("bad", 0.5f); break;
+                    case EffectKind.Spark: AudioService.Instance.Play("blip", 0.25f); break;
+                }
+            }
         }
 
         private static readonly Color YellowRang = new Color(1f, 0.96f, 0.5f);

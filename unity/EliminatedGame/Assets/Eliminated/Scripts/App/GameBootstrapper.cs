@@ -3,6 +3,7 @@ using Eliminated.Game.SimBridge;
 using Eliminated.Game.View;
 using Eliminated.Game.Input;
 using Eliminated.Game.UI;
+using Eliminated.Game.Audio;
 using Eliminated.Game.Save;
 
 namespace Eliminated.Game.App
@@ -25,6 +26,9 @@ namespace Eliminated.Game.App
             Object.DontDestroyOnLoad(app);
 
             var sim = app.AddComponent<SimRunner>();
+
+            var audio = app.AddComponent<AudioService>();
+            audio.Init();
 
             var arena = app.AddComponent<ArenaView>();
             arena.Init(sim);

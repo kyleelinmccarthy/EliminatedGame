@@ -36,8 +36,19 @@ Attribution required by a license is reproduced here *and* in the in-game Credit
 |---|---|---|---|---|
 | _(none yet — placeholders/primitives in use)_ | — | — | — | — |
 
-## Generated SFX
+## Generated SFX + music (shipped — our own output, no third-party license)
 
-Retro SFX generated with bfxr-style synthesis are produced by
-`tools/gen_sfx/` and are our own output (no third-party license). Each generated
-clip records its generation params next to it for reproducibility.
+18 real 16-bit PCM WAVs are produced by **`tools/SfxGen`** (bfxr-style procedural
+synthesis) and live under
+`unity/EliminatedGame/Assets/Eliminated/Resources/Audio/` (Git LFS), loaded at
+runtime by `AudioService`. Regenerate with:
+
+```bash
+dotnet run --project tools/SfxGen -- unity/EliminatedGame/Assets/Eliminated/Resources/Audio
+```
+
+Clips: `blip, click, good, bad, whoosh, throw, catch, explode, beep, alarm,
+chime, pickup, death, shatter, jump, drum, win` + a 4 s `music` loop. These are
+our own generated output and carry no third-party license (see
+`Resources/Audio/SFX_MANIFEST.md`). Phase 7 may layer in curated CC0 sets from
+Freesound/GameSounds.xyz — those get rows in the ledger above.
