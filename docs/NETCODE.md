@@ -10,7 +10,7 @@ transport that feeds it input and ships out snapshots changes.
 | **Solo / Local co-op** | In the client process (`SimHost`) | Local input devices → player slots; bots fill | Local view directly |
 | **Online host (listen server)** | On the host client (`SimHost`) | Local devices + remote peers' input RPCs | Local view + per-client snapshot RPCs |
 | **Online client** | — (remote) | Sends its own input RPCs | Receives snapshots, renders |
-| **Dedicated (future)** | Headless build (`SimHost`) | All players' input RPCs | All clients' snapshot RPCs |
+| **Dedicated (built)** | Headless `GameServer` (`server/`) | All players' input frames | All clients' snapshot frames |
 
 ## Transport choice
 

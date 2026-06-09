@@ -80,8 +80,22 @@ Requires the [.NET SDK](https://dotnet.microsoft.com/download) (8.0+):
 
 ```bash
 cd sim
-dotnet test          # runs the full simulation test suite
+dotnet test          # runs the full simulation test suite (+ the networked server smoke)
 ```
+
+### Headless authoritative server (online, no Unity required)
+
+A dedicated-server deployment runs the simulation over WebSockets and is
+buildable/runnable with the .NET SDK alone:
+
+```bash
+dotnet run --project server/Eliminated.Server -- 8080   # ws://localhost:8080/
+```
+
+The Unity client speaks the same protocol; online play can use Unity Relay
+(host-based) or this dedicated server. An end-to-end test
+(`server/Eliminated.Server.Tests`) drives a full series across two real
+WebSocket clients.
 
 ### Unity client
 
