@@ -58,8 +58,21 @@ namespace Eliminated.Game.View
             floor.transform.localScale = new Vector3(
                 Constants.ArenaW * LogicalSpace.Scale, Constants.ArenaH * LogicalSpace.Scale, 1f);
             var fr = floor.GetComponent<Renderer>();
-            fr.sharedMaterial = ViewMaterials.Shared;
-            ViewMaterials.SetColor(fr, new MaterialPropertyBlock(), new Color(0.16f, 0.18f, 0.24f));
+            // Apply a real (generated) themed floor texture, tiled across the arena.
+            var floorTex = LoadRandomFloorTexture();
+            var floorMat = new Material(ViewMaterials.Shared.shader) { name = "EliminatedFloor" };
+            var tiling = new Vector2(6f, 4f);
+            if (floorTex != null)
+            {
+                if (floorMat.HasProperty("_BaseMap")) { floorMat.SetTexture("_BaseMap", floorTex); floorMat.SetTextureScale("_BaseMap", tiling); }
+                if (floorMat.HasProperty("_MainTex")) { floorMat.SetTexture("_MainTex", floorTex); floorMat.SetTextureScale("_MainTex", tiling); }
+            }
+            else
+            {
+                if (floorMat.HasProperty("_BaseColor")) floorMat.SetColor("_BaseColor", new Color(0.16f, 0.18f, 0.24f));
+                if (floorMat.HasProperty("_Color")) floorMat.SetColor("_Color", new Color(0.16f, 0.18f, 0.24f));
+            }
+            fr.sharedMaterial = floorMat;
 
             // Light.
             var lightGo = new GameObject("Sun");
@@ -220,6 +233,16 @@ namespace Eliminated.Game.View
             go.transform.localScale = new Vector3(d, 0.04f, d); // a thin disc (default cylinder is 2 units tall)
             go.transform.position = LogicalSpace.ToWorld(lx, ly) + new Vector3(0f, height, 0f);
             ViewMaterials.SetColor(go.GetComponent<Renderer>(), new MaterialPropertyBlock(), color);
+        }
+
+        private static readonly string[] FloorThemes = { "courtyard", "neon", "candy", "toxic", "beach", "haunt" };
+
+        private static Texture2D LoadRandomFloorTexture()
+        {
+            string theme = FloorThemes[UnityEngine.Random.Range(0, FloorThemes.Length)];
+            var tex = Resources.Load<Texture2D>("Art/floor_" + theme);
+            if (tex != null) tex.wrapMode = TextureWrapMode.Repeat;
+            return tex;
         }
 
         /// <summary>Convert a screen point to logical arena coordinates (for aim).</summary>

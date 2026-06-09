@@ -36,6 +36,22 @@ Attribution required by a license is reproduced here *and* in the in-game Credit
 |---|---|---|---|---|
 | _(none yet — placeholders/primitives in use)_ | — | — | — | — |
 
+## Generated arena art (shipped — our own output, no third-party license)
+
+6 themed arena floor textures (256×256 32-bit TGA) are produced by **`tools/ArtGen`**
+into `unity/EliminatedGame/Assets/Eliminated/Resources/Art/` (Git LFS) and applied
+by `ArenaView` (a random theme per round, tiled). Themes/palettes match
+[GAME_DESIGN.md](GAME_DESIGN.md): courtyard, neon, candy, toxic, beach, haunt.
+Regenerate with:
+
+```bash
+dotnet run --project tools/ArtGen -- unity/EliminatedGame/Assets/Eliminated/Resources/Art
+```
+
+These are our own generated output (no third-party license). Real 3D blob models
+and richer arena props are sourced from the approved CC0 sites in Phase 7 and get
+rows in the ledger above.
+
 ## Generated SFX + music (shipped — our own output, no third-party license)
 
 18 real 16-bit PCM WAVs are produced by **`tools/SfxGen`** (bfxr-style procedural
