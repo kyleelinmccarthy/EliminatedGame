@@ -104,6 +104,12 @@ namespace Eliminated.Sim.Room
                 FinaleCapable = true,
                 Factory = ctx => new RpsMinusOne(ctx)
             },
+            [GameId.PresentSwap] = new GameMeta
+            {
+                Id = GameId.PresentSwap, Name = "Secret Santa Sabotage", Icon = "🎁",
+                MinPlayers = 4, RequiresEven = false, Cull = CullStrength.Mid,
+                Factory = ctx => new PresentSwap(ctx)
+            },
         };
 
         public static IReadOnlyCollection<GameId> Registered => Meta.Keys;
