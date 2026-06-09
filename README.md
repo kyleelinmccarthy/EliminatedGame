@@ -11,9 +11,13 @@ This repository is the **Unity 6 / C# remake** of the original web game
 Next.js + WebSocket), rebuilt as a **shippable, installable game** for Steam and
 beyond.
 
-> **Status:** Early development. The authoritative game simulation (`sim/`) is
-> being built test-first and runs headlessly today; the Unity client is being
-> built on top of it. See [docs/ROADMAP.md](docs/ROADMAP.md) for phase status.
+> **Status:** The authoritative simulation is **feature-complete** — all **16
+> minigames** (12 headline + 4 extras), the full series state machine, bots,
+> economy, cosmetics, and the netcode wire codec, behind **175 passing headless
+> tests** (`dotnet test`). A code-driven Unity slice plays solo-vs-bots today.
+> Remaining work is Unity-side integration (local co-op, online, Steam, full UI,
+> localization), scoped in [docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md).
+> See [docs/ROADMAP.md](docs/ROADMAP.md) for phase status.
 
 ---
 

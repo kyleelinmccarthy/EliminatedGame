@@ -15,17 +15,24 @@ by opening the project in Unity Hub.
 | **6 — Platforms & Steam** | Steamworks (achievements/cloud/leaderboards/invites/Input), Steam Deck verification, mobile touch + build settings | Deck + mobile builds |
 | **7 — Polish & store** | Localization pass, accessibility audit, full audio/music, store assets, EULA/privacy, IARC/ESRB, release pipeline, E2E smoke | Release candidate |
 
-## Current status
+## Current status (175 headless tests green)
 
 - [x] Phase 0 — Foundation (`dotnet test` green, CI wired)
-- [x] Phase 1 — Sim core + 3 games (88 headless tests green, incl. full-series E2E)
-- [x] Phase 2 — Unity vertical slice authored (code-driven, solo vs bots, 3 games,
+- [x] Phase 1 — Sim core + 3 games (incl. full-series E2E)
+- [x] Phase 2 — Unity vertical slice (code-driven, solo vs bots, 3 games rendered,
       menu→play→results, settings, local save) — *open in Unity 6 to verify visually*
-- [ ] Phase 3 — Breadth
-- [ ] Phase 4 — Local co-op
-- [ ] Phase 5 — Online
-- [ ] Phase 6 — Platforms & Steam
-- [ ] Phase 7 — Polish & store
+- [x] Phase 3 — Breadth: **ALL 16 minigames** (12 headline + 4 extras) with bots,
+      the `GameRoom` series state machine, cosmetics economy (38 chars +
+      accessories), an all-games smoke sweep, and the `Wire` netcode codec.
+      *Remaining client work (per-game view modules, shop UI) folded into Phase 7.*
+- [ ] Phase 4 — Local co-op — see [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)
+- [ ] Phase 5 — Online (UGS Relay/Lobby + NGO; `Wire` codec ready)
+- [ ] Phase 6 — Platforms & Steam (Facepunch.Steamworks)
+- [ ] Phase 7 — Polish, accessibility, localization, store
+
+The simulation is feature-complete and exhaustively tested headlessly; the
+remaining phases are Unity-side integration, each scoped in
+[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md).
 
 ## Code principles
 

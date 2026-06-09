@@ -42,14 +42,22 @@ namespace Eliminated.Game.Accessibility
         public static Color Safe => Mode == ColorblindMode.Tritanopia ? Hex("#00897b") : Hex("#00e676");
         public static Color Powerup(bool good) => good ? Safe : Danger;
 
+        // Keyed by the cosmetic roster ids (see Eliminated.Sim.Economy.Cosmetics).
         private static readonly Dictionary<string, Color> Bodies = new Dictionary<string, Color>
         {
-            { "avocado", Hex("#a8c64f") }, { "egg", Hex("#fff6e6") }, { "strawberry", Hex("#ef5350") },
-            { "eggplant", Hex("#7e57c2") }, { "broccoli", Hex("#66bb6a") }, { "donut", Hex("#ffb74d") },
-            { "pickle", Hex("#9ccc65") }, { "tomato", Hex("#e53935") }, { "koala", Hex("#b0bec5") },
-            { "aardvark", Hex("#bcaaa4") }, { "panther", Hex("#455a64") }, { "fox", Hex("#ff8a65") },
-            { "capybara", Hex("#a1887f") }, { "frogwizard", Hex("#81c784") }, { "rogue", Hex("#78909c") },
-            { "bunny", Hex("#f5f5f5") },
+            { "koala", Hex("#b0bec5") }, { "aardvark", Hex("#bcaaa4") }, { "panther", Hex("#455a64") },
+            { "fox", Hex("#ff8a65") }, { "capybara", Hex("#a1887f") }, { "wizard", Hex("#81c784") },
+            { "rogue", Hex("#78909c") }, { "bunny", Hex("#f5f5f5") }, { "pig", Hex("#f48fb1") },
+            { "cat", Hex("#ffcc80") }, { "mouse", Hex("#cfd8dc") }, { "hamster", Hex("#ffe0b2") },
+            { "ghost", Hex("#e0e0e0") }, { "slime", Hex("#9ccc65") }, { "avo", Hex("#a8c64f") },
+            { "egg", Hex("#fff6e6") }, { "berry", Hex("#ef5350") }, { "egg2", Hex("#7e57c2") },
+            { "brocc", Hex("#66bb6a") }, { "donut", Hex("#ffb74d") }, { "pickle", Hex("#9ccc65") },
+            { "tomato", Hex("#e53935") }, { "pine", Hex("#ffd54f") }, { "shroom", Hex("#bcaaa4") },
+            { "sushi", Hex("#fff3e0") }, { "nana", Hex("#fff176") }, { "plum", Hex("#9575cd") },
+            { "orange", Hex("#ffa726") }, { "blueberry", Hex("#5c6bc0") }, { "carrot", Hex("#ff7043") },
+            { "dragonfruit", Hex("#ec407a") }, { "melon", Hex("#ef5350") }, { "goldegg", Hex("#ffca28") },
+            { "onigiri", Hex("#eceff1") }, { "ninja", Hex("#37474f") }, { "sorcerer", Hex("#7e57c2") },
+            { "ghostpepper", Hex("#d32f2f") }, { "cosmic", Hex("#311b92") },
         };
 
         public static Color Body(string characterId)

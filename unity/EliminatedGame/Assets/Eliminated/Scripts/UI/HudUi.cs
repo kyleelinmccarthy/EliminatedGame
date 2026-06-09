@@ -130,7 +130,7 @@ namespace Eliminated.Game.UI
         {
             _seriesBanked = false;
             var prof = SaveService.Current;
-            _sim.HostLocalSeries(mode, RoundsMode.Fixed(4), prof?.name ?? "You", prof?.characterId ?? "avocado");
+            _sim.HostLocalSeries(mode, RoundsMode.Fixed(4), prof?.name ?? "You", prof?.characterId ?? "avo");
         }
 
         private void DrawIntro(float w, float h)

@@ -26,7 +26,7 @@ namespace Eliminated.Game.Save
     public sealed class PlayerProfile
     {
         public string name = "Blob";
-        public string characterId = "avocado";
+        public string characterId = "avo";
         public int marbles = 0;
         public int seriesWon = 0;
         public int roundsSurvived = 0;

@@ -26,7 +26,7 @@ namespace Eliminated.Game.SimBridge
 
         /// <summary>Start a solo-vs-bots series hosted locally.</summary>
         public void HostLocalSeries(SeriesMode mode, RoundsMode rounds,
-            string playerName = "You", string characterId = "avocado")
+            string playerName = "You", string characterId = "avo")
         {
             int seed = System.Environment.TickCount;
             Room = new GameRoom(RoomCode.Make(seed), seed);
