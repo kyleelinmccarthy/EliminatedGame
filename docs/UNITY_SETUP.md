@@ -67,6 +67,9 @@ arena, input, and UI on Play.
 4. Choose **Solo vs Bots — Casual** (or Hardcore). You play 4 rounds against bots
    across Red Light Green Light, Tug of War, and Boomerang Brawl, then see the
    results. Marbles you earn are saved to your local profile.
+5. **Local co-op (shared screen):** connect one or more gamepads and pick
+   **Local Co-op**. Player 1 uses keyboard&mouse; each gamepad is another player
+   (up to 4). Bots fill the rest. (P1's marbles bank to the local profile.)
 
 ### Controls (slice)
 

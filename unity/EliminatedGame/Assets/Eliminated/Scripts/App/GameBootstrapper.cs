@@ -29,7 +29,7 @@ namespace Eliminated.Game.App
             var arena = app.AddComponent<ArenaView>();
             arena.Init(sim);
 
-            var input = app.AddComponent<LocalInputRouter>();
+            var input = app.AddComponent<LocalInputHub>();
             input.Init(sim, arena);
 
             var hud = app.AddComponent<HudUi>();

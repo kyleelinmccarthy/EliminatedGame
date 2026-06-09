@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Eliminated.Sim.Model;
 using Eliminated.Sim.Games;
 using Eliminated.Sim.Room;
@@ -116,13 +118,23 @@ namespace Eliminated.Game.UI
             int marbles = SaveService.Current?.marbles ?? 0;
             GUI.Label(new Rect(bx, by - 40, bw, 30), $"◍ Marbles: {marbles}", new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
 
-            if (GUI.Button(new Rect(bx, by, bw, 54), "Solo vs Bots — Casual"))
+            if (GUI.Button(new Rect(bx, by, bw, 50), "Solo vs Bots — Casual"))
                 StartSolo(SeriesMode.Casual);
-            if (GUI.Button(new Rect(bx, by + 64, bw, 54), "Solo vs Bots — Hardcore (last blob standing)"))
+            if (GUI.Button(new Rect(bx, by + 58, bw, 50), "Solo vs Bots — Hardcore (last blob standing)"))
                 StartSolo(SeriesMode.Hardcore);
-            if (GUI.Button(new Rect(bx, by + 128, bw, 44), "Settings"))
+
+            int pads = Gamepad.all.Count;
+            string coopLabel = pads > 0
+                ? $"Local Co-op — P1 keyboard + {pads} gamepad{(pads > 1 ? "s" : "")}"
+                : "Local Co-op — connect a gamepad to add players";
+            GUI.enabled = pads > 0;
+            if (GUI.Button(new Rect(bx, by + 116, bw, 50), coopLabel))
+                StartCoop(SeriesMode.Casual);
+            GUI.enabled = true;
+
+            if (GUI.Button(new Rect(bx, by + 174, bw, 40), "Settings"))
                 _showSettings = true;
-            if (GUI.Button(new Rect(bx, by + 180, bw, 44), "Quit"))
+            if (GUI.Button(new Rect(bx, by + 220, bw, 40), "Quit"))
                 Application.Quit();
         }
 
@@ -131,6 +143,23 @@ namespace Eliminated.Game.UI
             _seriesBanked = false;
             var prof = SaveService.Current;
             _sim.HostLocalSeries(mode, RoundsMode.Fixed(4), prof?.name ?? "You", prof?.characterId ?? "avo");
+        }
+
+        private void StartCoop(SeriesMode mode)
+        {
+            _seriesBanked = false;
+            var prof = SaveService.Current;
+            // P1 = keyboard (the saved profile); each connected gamepad = another player.
+            int count = Mathf.Clamp(1 + Gamepad.all.Count, 1, 4); // shared screen: cap at 4
+            var roster = new List<string> { "fox", "panther", "bunny", "cat" };
+            var locals = new List<LocalPlayerInfo>();
+            for (int i = 0; i < count; i++)
+            {
+                string name = i == 0 ? (prof?.name ?? "P1") : $"P{i + 1}";
+                string ch = i == 0 ? (prof?.characterId ?? "avo") : roster[i % roster.Count];
+                locals.Add(new LocalPlayerInfo("local" + i, name, ch));
+            }
+            _sim.HostLocalCoop(mode, RoundsMode.Fixed(4), locals);
         }
 
         private void DrawIntro(float w, float h)
