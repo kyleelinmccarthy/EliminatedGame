@@ -65,6 +65,25 @@ namespace Eliminated.Sim.Room
                 Finale = true, FinaleCapable = true, Nightable = true,
                 Factory = ctx => new KingOfTheHill(ctx)
             },
+            [GameId.Dodgeball] = new GameMeta
+            {
+                Id = GameId.Dodgeball, Name = "Dodgeball", Icon = "🤾",
+                MinPlayers = 2, RequiresEven = true, Cull = CullStrength.High,
+                Nightable = true,
+                Factory = ctx => new Dodgeball(ctx)
+            },
+            [GameId.MusicalChairs] = new GameMeta
+            {
+                Id = GameId.MusicalChairs, Name = "Musical Chairs", Icon = "🪑",
+                MinPlayers = 3, RequiresEven = false, Cull = CullStrength.Low,
+                Factory = ctx => new MusicalChairs(ctx)
+            },
+            [GameId.Mingle] = new GameMeta
+            {
+                Id = GameId.Mingle, Name = "Mingle", Icon = "🫂",
+                MinPlayers = 4, RequiresEven = false, Cull = CullStrength.Mid,
+                Factory = ctx => new Mingle(ctx)
+            },
         };
 
         public static IReadOnlyCollection<GameId> Registered => Meta.Keys;
