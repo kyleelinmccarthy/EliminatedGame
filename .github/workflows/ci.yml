@@ -35,17 +35,7 @@ jobs:
           path: TestResults/**/*.trx
           if-no-files-found: ignore
 
-  # Unity build/test (Phase 2+) — wired up with GameCI once the client and a
-  # Unity license secret are in place. Left documented here as the next CI step.
-  # unity-tests:
-  #   name: Unity EditMode/PlayMode tests
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with: { lfs: true }
-  #     - uses: game-ci/unity-test-runner@v4
-  #       env:
-  #         UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-  #       with:
-  #         projectPath: unity/EliminatedGame
-  #         testMode: all
+  # Unity EditMode/PlayMode tests + installable cross-platform builds live in a
+  # separate workflow (.github/workflows/unity.yml) that runs once a Unity license
+  # secret is configured (GameCI). It builds Windows / Linux (Steam Deck) / Android
+  # / WebGL and uploads the installers as artifacts.

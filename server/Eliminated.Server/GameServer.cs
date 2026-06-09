@@ -189,8 +189,10 @@ namespace Eliminated.Server
 
         private byte[] BuildSnapshotFrame(Snapshot snap, string playerId)
         {
-            object secret = (snap.Secrets != null && playerId != null && snap.Secrets.TryGetValue(playerId, out var s)) ? s : null;
-            string dataJson = JsonSerializer.Serialize(new { data = snap.Data, secret }, _json);
+            // Send the per-game Data object directly so the client can
+            // JsonUtility.FromJson it into the matching type (DataWire). Per-player
+            // secrets (Secret Santa) are intentionally NOT sent (no info leak).
+            string dataJson = snap.Data != null ? JsonSerializer.Serialize(snap.Data, _json) : null;
             byte[] frame = Wire.EncodeFrame(snap.Game, snap.T, snap.StartAt, snap.Actors, snap.Fx, dataJson);
             var tagged = new byte[frame.Length + 1];
             tagged[0] = 2; // snapshot

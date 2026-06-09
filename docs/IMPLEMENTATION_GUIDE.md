@@ -63,12 +63,13 @@ host runs the authoritative `GameRoom`. The `Wire` codec
    render/drive either mode). `NetClient` (`Scripts/Net/NetClient.cs`, behind the
    `ELIMINATED_ONLINE` define) is **written**: it connects to the server, decodes
    snapshot frames into actors, and sends input — talking the exact protocol the
-   verified headless server speaks. **Remaining (in-editor):** (a) a small online
-   menu (Host / Join-by-code) that creates a `NetClient` and points
-   `ArenaView`/input at it; (b) decode `frame.DataJson` into the per-game
-   `Snapshot.Data` type with `JsonUtility.FromJson<T>` keyed by `frame.Game` so
-   props/discrete HUDs render online (blobs already do); (c) drive the HUD's
-   results screens from the room message's `lastRound`/`standings` (already sent).
+   verified headless server speaks. Per-game `Snapshot.Data` decode is **done**
+   (`NetClient.DecodeData`, mirroring `DataWire.TypeFor`, verified for all 16 games
+   by `DataWireTests`), so props/discrete HUDs render online too. **Remaining
+   (in-editor):** (a) a small online menu (Host / Join-by-code) that creates a
+   `NetClient` and points `ArenaView`/input at it; (b) drive the HUD's results
+   screens from the room message's `lastRound`/`standings` (already sent). That's
+   the whole online client.
 7. **Bots** are added by the host into the room as before (never networked).
 8. **Reconnection:** rebind a returning client to its existing `Player` by a stable
    `clientId`; its actor kept ticking as idle while away (the sim already tolerates

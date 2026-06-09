@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using Eliminated.Sim.Core;
+using Eliminated.Sim.Games;
 using Eliminated.Sim.Model;
 using Eliminated.Sim.Net;
 
@@ -152,10 +153,36 @@ namespace Eliminated.Game.Net
                     Ghost = na.Has(NetActor.Ghost)
                 });
             }
-            // TODO: decode f.DataJson into the per-game Snapshot.Data type keyed by
-            // f.Game (JsonUtility.FromJson<KothData>(...) etc.) so props/discrete HUDs
-            // render online too. Blobs already render from the actors above.
+            // Decode the per-game data so props/discrete HUDs render online too.
+            snap.Data = DecodeData(f.Game, f.DataJson);
             _latest = snap;
+        }
+
+        /// <summary>Deserialize the per-game data json into the type
+        /// <see cref="DataWire.TypeFor"/> declares (verified by DataWireTests).</summary>
+        private static object DecodeData(GameId game, string json)
+        {
+            if (string.IsNullOrEmpty(json)) return null;
+            switch (game)
+            {
+                case GameId.RedLight: return JsonUtility.FromJson<RedLightGreenLight.RlglData>(json);
+                case GameId.Tag: return JsonUtility.FromJson<Tag.TagData>(json);
+                case GameId.Mingle: return JsonUtility.FromJson<Mingle.MingleData>(json);
+                case GameId.GlassBridge: return JsonUtility.FromJson<GlassBridge.GlassData>(json);
+                case GameId.TugOfWar: return JsonUtility.FromJson<TugOfWar.TugData>(json);
+                case GameId.RpsMinusOne: return JsonUtility.FromJson<RpsMinusOne.RpsData>(json);
+                case GameId.JumpRope: return JsonUtility.FromJson<JumpRope.RopeData>(json);
+                case GameId.Boomerang: return JsonUtility.FromJson<Boomerang.BoomData>(json);
+                case GameId.Dodgeball: return JsonUtility.FromJson<Dodgeball.DodgeData>(json);
+                case GameId.MusicalChairs: return JsonUtility.FromJson<MusicalChairs.McData>(json);
+                case GameId.PresentSwap: return JsonUtility.FromJson<PresentSwap.PresentData>(json);
+                case GameId.PropHunt: return JsonUtility.FromJson<PropHunt.PropData>(json);
+                case GameId.ChutesAndLadders: return JsonUtility.FromJson<ChutesAndLadders.ChutesData>(json);
+                case GameId.SimonSays: return JsonUtility.FromJson<SimonSays.SimonData>(json);
+                case GameId.KeepyUppy: return JsonUtility.FromJson<KeepyUppy.KeepyData>(json);
+                case GameId.KingOfTheHill: return JsonUtility.FromJson<KingOfTheHill.KothData>(json);
+                default: return null;
+            }
         }
 
         // ── Send ─────────────────────────────────────────────────────────
