@@ -8,6 +8,8 @@ using Eliminated.Sim.Room;
 using Eliminated.Game.SimBridge;
 using Eliminated.Game.Save;
 using Eliminated.Game.Accessibility;
+using Eliminated.Game.Audio;
+using Eliminated.Game.Platform;
 using Eliminated.Sim.Localization;
 
 namespace Eliminated.Game.UI
@@ -65,6 +67,13 @@ namespace Eliminated.Game.UI
                     var champ = room?.SeriesResult?.ChampionId;
                     var champP = room?.Players.FirstOrDefault(p => p.Id == champ);
                     if (champP != null) Caption(Loc.Get("gm.champion", champP.Name), 8f);
+                    AudioService.Instance?.Play("win");
+                    if (champ == SimRunner.LocalPlayerId) // the local player won the series
+                    {
+                        SteamService.Instance?.Unlock("SERIES_WIN");
+                        SteamService.Instance?.SubmitLeaderboard("marbles", SaveService.Current?.marbles ?? 0);
+                    }
+                    SteamService.Instance?.Unlock("FIRST_SERIES"); // played a full series
                     break;
             }
         }

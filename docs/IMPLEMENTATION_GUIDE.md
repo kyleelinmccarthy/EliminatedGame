@@ -79,10 +79,14 @@ host runs the authoritative `GameRoom`. The `Wire` codec
 
 ## Phase 6 — Platforms & Steam
 
-1. **Steamworks:** import **Facepunch.Steamworks** (MIT) as a plugin under
-   `Assets/Plugins/`; add a git-ignored `steam_appid.txt` (480 for testing).
-   Wrap it in a `SteamService` (init/shutdown, guarded so non-Steam builds still
-   run). Wire:
+1. **Steamworks:** `SteamService` is **already written**
+   (`Scripts/Platform/SteamService.cs`) — init/shutdown, achievements, leaderboard,
+   rich presence, all behind the `ELIMINATED_STEAM` define so the project compiles
+   without the plugin. To enable: import **Facepunch.Steamworks** (MIT) under
+   `Assets/Plugins/`, add a git-ignored `steam_appid.txt` (480 for testing), and
+   add `ELIMINATED_STEAM` to *Player → Scripting Define Symbols*. It's already
+   wired in the bootstrap and fires achievements/leaderboard on series end. Then
+   complete:
    - **Achievements** from results the sim computes (first win, champion, survive
      a Hardcore series, play each game…).
    - **Steam Cloud:** auto-sync the `profile.json` written by `SaveService`
@@ -95,9 +99,11 @@ host runs the authoritative `GameRoom`. The `Wire` codec
 2. **Steam Deck verified checklist:** default controller config, ≥9 pt text,
    suspend/resume safe, native 1280×800, no external launchers. Run the Deck
    compatibility tool.
-3. **Mobile (Android/iOS):** the on-screen touch controls in `LocalInputRouter`
-   need a UI overlay (left joystick + context buttons); add IL2CPP + ARM64 build
-   settings; verify the 1280×720 arena letterboxes cleanly.
+3. **Mobile (Android/iOS):** on-screen touch controls are **already written**
+   (`Scripts/Input/TouchControls.cs` — left virtual joystick + action/dash buttons,
+   game-aware, only shown when a touchscreen is present) and wired in the bootstrap.
+   Remaining: add IL2CPP + ARM64 build settings, set up the Android/iOS modules, and
+   verify the 1280×720 arena letterboxes cleanly. Polish the touch UI art in Phase 7.
 4. **Cross-play:** UGS Relay/Lobby is platform-agnostic, so PC ↔ mobile ↔ Deck
    share rooms; layer Steam features only on Steam builds (guarded by `SteamService`).
 

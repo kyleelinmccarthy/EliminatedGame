@@ -4,6 +4,7 @@ using Eliminated.Game.View;
 using Eliminated.Game.Input;
 using Eliminated.Game.UI;
 using Eliminated.Game.Audio;
+using Eliminated.Game.Platform;
 using Eliminated.Game.Save;
 
 namespace Eliminated.Game.App
@@ -35,6 +36,12 @@ namespace Eliminated.Game.App
 
             var input = app.AddComponent<LocalInputHub>();
             input.Init(sim, arena);
+
+            var touch = app.AddComponent<TouchControls>();
+            touch.Init(sim);
+
+            var steam = app.AddComponent<SteamService>();
+            steam.Init(480); // Spacewar test app id; replace with the real one for release
 
             var hud = app.AddComponent<HudUi>();
             hud.Init(sim);
