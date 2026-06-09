@@ -200,6 +200,8 @@ namespace Eliminated.Server
 
         private string BuildRoomJson(GameRoom room, string youAre)
         {
+            var report = room.LastRoundReport;
+            var series = room.SeriesResult;
             return JsonSerializer.Serialize(new
             {
                 t = "room",
@@ -210,7 +212,15 @@ namespace Eliminated.Server
                 youAre,
                 isHost = room.HostId == youAre,
                 players = room.Players.Select(p => new { p.Id, p.Name, p.Number, alive = p.AliveInSeries, bot = p.IsBot, p.MarblesEarned }).ToList(),
-                champion = room.SeriesResult?.ChampionId
+                champion = series?.ChampionId,
+                // results so the client's round/series screens render online too
+                lastRound = report == null ? null : new
+                {
+                    game = report.Game.ToString(),
+                    number = report.RoundNumber,
+                    entries = report.Entries.Select(e => new { e.PlayerId, e.Placement, e.Survived, marbles = e.MarblesEarned, e.Note }).ToList()
+                },
+                standings = series?.Standings.Select(s => new { s.PlayerId, s.Placement, s.Marbles, s.RoundsSurvived, s.Title }).ToList()
             }, _json);
         }
 

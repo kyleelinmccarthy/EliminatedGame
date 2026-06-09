@@ -28,6 +28,7 @@ namespace Eliminated.Server.Tests
             public volatile string Phase;
             public volatile string Champion;
             public int SnapCount;
+            public int StandingsCount;
         }
 
         [Fact]
@@ -68,7 +69,8 @@ namespace Eliminated.Server.Tests
                 Assert.True(sa.SnapCount > 0, "host received no snapshots");
                 Assert.True(sb.SnapCount > 0, "joiner received no snapshots");
                 Assert.False(string.IsNullOrEmpty(sa.Champion), "no champion was crowned");
-                Assert.Equal(sa.Champion, sb.Champion); // both clients agree on the winner
+                Assert.Equal(sa.Champion, sb.Champion);      // both clients agree on the winner
+                Assert.True(sa.StandingsCount >= 6, "final standings were not broadcast");
             }
             finally
             {
@@ -123,6 +125,8 @@ namespace Eliminated.Server.Tests
                             break;
                         case "room":
                             s.Phase = root.GetProperty("phase").GetString();
+                            if (root.TryGetProperty("standings", out var st) && st.ValueKind == JsonValueKind.Array)
+                                s.StandingsCount = st.GetArrayLength();
                             if (root.TryGetProperty("champion", out var ch) && ch.ValueKind == JsonValueKind.String)
                             {
                                 s.Champion = ch.GetString();
