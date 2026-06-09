@@ -8,6 +8,7 @@ using Eliminated.Sim.Room;
 using Eliminated.Game.SimBridge;
 using Eliminated.Game.Save;
 using Eliminated.Game.Accessibility;
+using Eliminated.Sim.Localization;
 
 namespace Eliminated.Game.UI
 {
@@ -57,13 +58,13 @@ namespace Eliminated.Game.UI
             {
                 case RoomPhase.Intro:
                     if (room?.CurrentGame != null)
-                        Caption($"Game Master: Game {room.RoundIndex + 1} — {GameCatalog.Of(room.CurrentGame.Value).Name}.", 5f);
+                        Caption(Loc.Get("gm.game_intro", room.RoundIndex + 1, GameName(room.CurrentGame.Value)), 5f);
                     break;
                 case RoomPhase.SeriesResult:
                     BankMarbles();
                     var champ = room?.SeriesResult?.ChampionId;
                     var champP = room?.Players.FirstOrDefault(p => p.Id == champ);
-                    if (champP != null) Caption($"Game Master: {champP.Name} is the last blob standing!", 8f);
+                    if (champP != null) Caption(Loc.Get("gm.champion", champP.Name), 8f);
                     break;
             }
         }
@@ -109,18 +110,20 @@ namespace Eliminated.Game.UI
             DrawCaption(w, h);
         }
 
+        private static string GameName(GameId id) => Loc.Get("game." + id);
+
         private void DrawMenu(float w, float h)
         {
-            GUI.Label(new Rect(0, h * 0.18f, w, 60), "◖◗ ELIMINATED", _h1);
-            GUI.Label(new Rect(0, h * 0.26f, w, 30), "A wholesome party game where everyone dies.", new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(0, h * 0.18f, w, 60), "◖◗ " + Loc.Get("ui.title"), _h1);
+            GUI.Label(new Rect(0, h * 0.26f, w, 30), Loc.Get("ui.tagline"), new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
 
             float bw = 360, bx = (w - bw) / 2f, by = h * 0.40f;
             int marbles = SaveService.Current?.marbles ?? 0;
-            GUI.Label(new Rect(bx, by - 40, bw, 30), $"◍ Marbles: {marbles}", new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(bx, by - 40, bw, 30), $"◍ {Loc.Get("ui.marbles")}: {marbles}", new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
 
-            if (GUI.Button(new Rect(bx, by, bw, 50), "Solo vs Bots — Casual"))
+            if (GUI.Button(new Rect(bx, by, bw, 50), Loc.Get("ui.play_solo_casual")))
                 StartSolo(SeriesMode.Casual);
-            if (GUI.Button(new Rect(bx, by + 58, bw, 50), "Solo vs Bots — Hardcore (last blob standing)"))
+            if (GUI.Button(new Rect(bx, by + 58, bw, 50), Loc.Get("ui.play_solo_hardcore")))
                 StartSolo(SeriesMode.Hardcore);
 
             int pads = Gamepad.all.Count;
@@ -132,9 +135,9 @@ namespace Eliminated.Game.UI
                 StartCoop(SeriesMode.Casual);
             GUI.enabled = true;
 
-            if (GUI.Button(new Rect(bx, by + 174, bw, 40), "Settings"))
+            if (GUI.Button(new Rect(bx, by + 174, bw, 40), Loc.Get("ui.settings")))
                 _showSettings = true;
-            if (GUI.Button(new Rect(bx, by + 220, bw, 40), "Quit"))
+            if (GUI.Button(new Rect(bx, by + 220, bw, 40), Loc.Get("ui.quit")))
                 Application.Quit();
         }
 
@@ -165,11 +168,11 @@ namespace Eliminated.Game.UI
         private void DrawIntro(float w, float h)
         {
             var room = _sim.Room;
-            string name = room?.CurrentGame != null ? GameCatalog.Of(room.CurrentGame.Value).Name : "";
+            string name = room?.CurrentGame != null ? GameName(room.CurrentGame.Value) : "";
             string icon = room?.CurrentGame != null ? GameCatalog.Of(room.CurrentGame.Value).Icon : "";
-            GUI.Label(new Rect(0, h * 0.35f, w, 60), $"Game {(room?.RoundIndex ?? 0) + 1}", _h2WithCenter());
+            GUI.Label(new Rect(0, h * 0.35f, w, 60), Loc.Get("ui.round", (room?.RoundIndex ?? 0) + 1), _h2WithCenter());
             GUI.Label(new Rect(0, h * 0.42f, w, 70), $"{icon} {name}", _h1);
-            GUI.Label(new Rect(0, h * 0.52f, w, 40), "Get ready…", new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
+            GUI.Label(new Rect(0, h * 0.52f, w, 40), Loc.Get("ui.get_ready"), new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
         }
 
         private GUIStyle _h2WithCenter() => new GUIStyle(_h2) { alignment = TextAnchor.MiddleCenter };
@@ -178,7 +181,7 @@ namespace Eliminated.Game.UI
         {
             var room = _sim.Room;
             var snap = _sim.Latest;
-            string game = room?.CurrentGame != null ? GameCatalog.Of(room.CurrentGame.Value).Name : "";
+            string game = room?.CurrentGame != null ? GameName(room.CurrentGame.Value) : "";
             int alive = snap?.Actors?.Count(a => a.Alive) ?? 0;
 
             GUI.Box(new Rect(10, 10, 360, 64), "");
@@ -301,7 +304,7 @@ namespace Eliminated.Game.UI
         private void DrawRoundResult(float w, float h)
         {
             var report = _sim.Room?.LastRoundReport;
-            GUI.Label(new Rect(0, h * 0.10f, w, 50), "The Reckoning", _h1);
+            GUI.Label(new Rect(0, h * 0.10f, w, 50), Loc.Get("ui.reckoning"), _h1);
             if (report == null) return;
             float y = h * 0.22f;
             foreach (var e in report.Entries)
@@ -318,7 +321,7 @@ namespace Eliminated.Game.UI
         private void DrawSeriesResult(float w, float h)
         {
             var sr = _sim.Room?.SeriesResult;
-            GUI.Label(new Rect(0, h * 0.10f, w, 50), "👑 Series Over", _h1);
+            GUI.Label(new Rect(0, h * 0.10f, w, 50), "👑 " + Loc.Get("ui.series_over"), _h1);
             if (sr != null)
             {
                 float y = h * 0.22f;
@@ -330,7 +333,7 @@ namespace Eliminated.Game.UI
                 }
             }
             float bw = 320;
-            if (GUI.Button(new Rect((w - bw) / 2f, h * 0.82f, bw, 50), "Back to Menu"))
+            if (GUI.Button(new Rect((w - bw) / 2f, h * 0.82f, bw, 50), Loc.Get("ui.back_to_menu")))
             {
                 _sim.EndSeries();
                 _lastPhase = RoomPhase.Lobby;
@@ -350,8 +353,15 @@ namespace Eliminated.Game.UI
         private void DrawSettings(float w, float h)
         {
             var s = SaveService.Current.settings;
-            GUI.Label(new Rect(0, h * 0.10f, w, 50), "Settings", _h1);
-            float x = w * 0.5f - 220, y = h * 0.24f;
+            GUI.Label(new Rect(0, h * 0.10f, w, 50), Loc.Get("ui.settings"), _h1);
+            float x = w * 0.5f - 220, y = h * 0.22f;
+
+            GUI.Label(new Rect(x, y, 440, 26), "Language:", _body); y += 30;
+            int li = System.Array.IndexOf(Loc.Locales, s.locale);
+            if (li < 0) li = 0;
+            int newLi = GUI.Toolbar(new Rect(x, y, 440, 36), li, Loc.Locales);
+            if (newLi != li) { s.locale = Loc.Locales[newLi]; Loc.SetLocale(s.locale); }
+            y += 50;
 
             GUI.Label(new Rect(x, y, 440, 26), "Colorblind mode:", _body); y += 30;
             var modes = (ColorblindMode[])System.Enum.GetValues(typeof(ColorblindMode));
@@ -369,7 +379,7 @@ namespace Eliminated.Game.UI
 
             GUI.Label(new Rect(x, y, 440, 24), "Controls are remappable in a later build (accessibility).", new GUIStyle(_body) { fontSize = 14 }); y += 40;
 
-            if (GUI.Button(new Rect(x, y, 440, 44), "Save & Back"))
+            if (GUI.Button(new Rect(x, y, 440, 44), Loc.Get("ui.save_and_back")))
             {
                 SaveService.Save();
                 _showSettings = false;

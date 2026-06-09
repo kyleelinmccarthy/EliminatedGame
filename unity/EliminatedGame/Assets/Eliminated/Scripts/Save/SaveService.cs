@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 using Eliminated.Game.Accessibility;
+using Eliminated.Sim.Localization;
 
 namespace Eliminated.Game.Save
 {
@@ -61,6 +62,7 @@ namespace Eliminated.Game.Save
             if (s == null) return;
             Palette.Mode = s.colorblind;
             AudioListener.volume = Mathf.Clamp01(s.masterVolume);
+            Loc.SetLocale(string.IsNullOrEmpty(s.locale) ? Loc.Default : s.locale);
         }
     }
 }
