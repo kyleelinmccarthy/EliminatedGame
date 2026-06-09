@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless authoritative game server (the "dedicated server" deployment).
+    Hosts the pure-C# simulation via RoomManager over WebSockets, using the
+    tested Wire codec for input/snapshots. Buildable + runnable with the .NET SDK
+    (no Unity), so the online protocol can be end-to-end tested here.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Eliminated.Server</RootNamespace>
+    <AssemblyName>Eliminated.Server</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\sim\Eliminated.Sim\Eliminated.Sim.csproj" />
+  </ItemGroup>
+
+</Project>
