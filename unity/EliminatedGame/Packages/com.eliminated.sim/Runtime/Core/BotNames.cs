@@ -20,12 +20,11 @@ namespace Eliminated.Sim.Core
             "Pretzel", "Mochi"
         };
 
-        /// <summary>The 16 starter blob characters (ids match the client roster).</summary>
+        /// <summary>Free starter character ids (subset of the cosmetic roster).</summary>
         public static readonly string[] Characters =
         {
-            "avocado", "egg", "strawberry", "eggplant", "broccoli", "donut", "pickle",
-            "tomato", "koala", "aardvark", "panther", "fox", "capybara", "frogwizard",
-            "rogue", "bunny"
+            "koala", "fox", "panther", "bunny", "cat", "avo", "egg", "berry",
+            "donut", "pickle", "tomato", "sushi", "nana", "slime", "ghost", "capybara"
         };
 
         public static string Random(Rng rng) => $"{rng.Pick(First)} {rng.Pick(Last)}";

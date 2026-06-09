@@ -177,23 +177,34 @@ namespace Eliminated.Sim.Games
 
         private void Resolve()
         {
-            foreach (var c in _cs.Values)
+            var alive = _cs.Values.Where(c => c.Alive).ToList();
+            var losers = new List<(Contestant c, string note)>();
+            foreach (var c in alive)
             {
-                if (!c.Alive) continue;
                 bool survived; string note = "";
                 if (_commandFreeze) { survived = c.Did == null; if (!survived) note = "Twitched on FREEZE!"; }
                 else if (c.Did == _command) survived = true;
                 else if (c.Did == null) { survived = false; note = "Too slow!"; }
                 else { survived = false; note = "Wrong move!"; }
-
-                if (survived) { c.ResultKind = "safe"; c.SurvivedBeats = _beat; }
-                else
-                {
-                    c.ResultKind = "out"; c.Alive = false; SyncActor(c.Id, false);
-                    _elim.Add((c.Id, note));
-                    _fx.Add(new Effect(EffectKind.Death));
-                }
+                if (!survived) losers.Add((c, note));
             }
+
+            // never wipe the whole field on a single beat — spare the first if all fail
+            if (losers.Count == alive.Count && losers.Count > 0) losers.RemoveAt(0);
+
+            var loserSet = new HashSet<string>(losers.Select(l => l.c.Id));
+            foreach (var c in alive)
+            {
+                if (loserSet.Contains(c.Id)) continue;
+                c.ResultKind = "safe"; c.SurvivedBeats = _beat;
+            }
+            foreach (var (c, note) in losers)
+            {
+                c.ResultKind = "out"; c.Alive = false; SyncActor(c.Id, false);
+                _elim.Add((c.Id, note));
+                _fx.Add(new Effect(EffectKind.Death));
+            }
+
             _phase = "judge";
             _phaseTime = 0f;
         }
