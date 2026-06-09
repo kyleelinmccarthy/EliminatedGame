@@ -57,11 +57,18 @@ host runs the authoritative `GameRoom`. The `Wire` codec
      **per client**, folding that client's entry from `snap.Secrets` into the
      `DataJson` so hidden-role info (Secret Santa) only reaches its owner.
    - Also broadcast `RoomState` (phase, round, current game, players) on change.
-6. **Client side becomes a snapshot consumer:** introduce an `ISnapshotSource`
-   that both `SimRunner` (in-process) and a new `NetClient` implement; point
-   `ArenaView`/`HudUi` at the interface so they don't care whether play is local
-   or online. Decode `DataJson` back into the per-game data type with
-   `JsonUtility.FromJson<T>` keyed by `frame.Game`.
+6. **Client side is already a snapshot consumer:** `ISnapshotSource`
+   (`Scripts/Net/ISnapshotSource.cs`) is **written** and `SimRunner` implements it;
+   `ArenaView`/`LocalInputHub`/`TouchControls` already read the interface (so they
+   render/drive either mode). `NetClient` (`Scripts/Net/NetClient.cs`, behind the
+   `ELIMINATED_ONLINE` define) is **written**: it connects to the server, decodes
+   snapshot frames into actors, and sends input — talking the exact protocol the
+   verified headless server speaks. **Remaining (in-editor):** (a) a small online
+   menu (Host / Join-by-code) that creates a `NetClient` and points
+   `ArenaView`/input at it; (b) decode `frame.DataJson` into the per-game
+   `Snapshot.Data` type with `JsonUtility.FromJson<T>` keyed by `frame.Game` so
+   props/discrete HUDs render online (blobs already do); (c) drive the HUD's
+   results screens from the room message's `lastRound`/`standings` (already sent).
 7. **Bots** are added by the host into the room as before (never networked).
 8. **Reconnection:** rebind a returning client to its existing `Player` by a stable
    `clientId`; its actor kept ticking as idle while away (the sim already tolerates

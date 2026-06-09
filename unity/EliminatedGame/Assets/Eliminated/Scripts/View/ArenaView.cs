@@ -6,6 +6,7 @@ using Eliminated.Sim.Model;
 using Eliminated.Sim.Powerups;
 using Eliminated.Game.Accessibility;
 using Eliminated.Game.Audio;
+using Eliminated.Game.Net;
 using Eliminated.Game.SimBridge;
 
 namespace Eliminated.Game.View
@@ -19,7 +20,7 @@ namespace Eliminated.Game.View
     /// </summary>
     public sealed class ArenaView : MonoBehaviour
     {
-        private SimRunner _sim;
+        private ISnapshotSource _sim;
         private Camera _camera;
         private readonly Dictionary<string, BlobView> _blobs = new Dictionary<string, BlobView>();
         private readonly List<GameObject> _props = new List<GameObject>();
@@ -27,7 +28,7 @@ namespace Eliminated.Game.View
 
         public Camera Camera => _camera;
 
-        public void Init(SimRunner sim)
+        public void Init(ISnapshotSource sim)
         {
             _sim = sim;
             BuildStage();

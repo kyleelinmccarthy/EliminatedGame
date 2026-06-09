@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Eliminated.Sim.Model;
+using Eliminated.Game.Net;
 using Eliminated.Game.SimBridge;
 using Eliminated.Game.View;
 
@@ -16,10 +17,10 @@ namespace Eliminated.Game.Input
     /// </summary>
     public sealed class LocalInputHub : MonoBehaviour
     {
-        private SimRunner _sim;
+        private ISnapshotSource _sim;
         private ArenaView _arena;
 
-        public void Init(SimRunner sim, ArenaView arena) { _sim = sim; _arena = arena; }
+        public void Init(ISnapshotSource sim, ArenaView arena) { _sim = sim; _arena = arena; }
 
         private struct Controls { public float Dx, Dy; public bool Primary, Dash, HasAim; public float Aim; }
 

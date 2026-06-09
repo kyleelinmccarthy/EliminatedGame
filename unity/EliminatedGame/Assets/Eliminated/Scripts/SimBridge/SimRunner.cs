@@ -3,6 +3,7 @@ using UnityEngine;
 using Eliminated.Sim.Core;
 using Eliminated.Sim.Model;
 using Eliminated.Sim.Room;
+using Eliminated.Game.Net;
 
 namespace Eliminated.Game.SimBridge
 {
@@ -23,7 +24,7 @@ namespace Eliminated.Game.SimBridge
     /// (Phase 5) swaps this for a networked snapshot source behind the same read
     /// surface (see docs/IMPLEMENTATION_GUIDE.md).
     /// </summary>
-    public sealed class SimRunner : MonoBehaviour
+    public sealed class SimRunner : MonoBehaviour, ISnapshotSource
     {
         public const string LocalPlayerId = "local0";
 

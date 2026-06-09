@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Eliminated.Sim.Model;
+using Eliminated.Game.Net;
 using Eliminated.Game.SimBridge;
 
 namespace Eliminated.Game.Input
@@ -14,10 +15,10 @@ namespace Eliminated.Game.Input
     /// </summary>
     public sealed class TouchControls : MonoBehaviour
     {
-        private SimRunner _sim;
+        private ISnapshotSource _sim;
         private GUIStyle _btn;
 
-        public void Init(SimRunner sim) => _sim = sim;
+        public void Init(ISnapshotSource sim) => _sim = sim;
 
         private static bool TouchPresent => Touchscreen.current != null;
 
