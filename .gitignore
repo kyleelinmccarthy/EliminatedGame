@@ -55,3 +55,7 @@ secrets/
 # ───────────────────────────── Tooling state ─────────────────────
 # Local Claude Code settings (machine-specific; not shared)
 .claude/settings.local.json
+
+# Server publish output (tools/publish-server.sh)
+/dist/
+/build/

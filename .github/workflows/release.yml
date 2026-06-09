@@ -1,0 +1,41 @@
+name: Release — dedicated server binaries
+
+# Builds the self-contained, cross-platform dedicated-server binaries and attaches
+# them to the GitHub Release for the pushed tag. This needs no Unity license (the
+# server is pure .NET), so it produces real installable binaries on every release
+# tag. The Unity *client* installers are built by unity.yml (once UNITY_LICENSE is
+# set). Triggered only when YOU push a tag — nothing is published automatically.
+
+on:
+  push:
+    tags: [ 'v*', 'server-v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to create/update the release
+
+jobs:
+  server:
+    name: Build server binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build cross-platform binaries
+        run: |
+          chmod +x tools/publish-server.sh
+          tools/publish-server.sh
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/eliminated-server-*
+            dist/SHA256SUMS.txt
+          prerelease: true
+          body: |
+            Self-contained dedicated **game server** binaries (the authoritative
+            online backend — all 16 minigames over WebSockets). No runtime needed:
+            download, `chmod +x`, run `./eliminated-server-<rid> 8080`.
+            The Unity client installers are produced by the Unity build workflow.

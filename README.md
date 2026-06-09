@@ -97,6 +97,18 @@ The Unity client speaks the same protocol; online play can use Unity Relay
 (`server/Eliminated.Server.Tests`) drives a full series across two real
 WebSocket clients.
 
+**Ship the server as standalone binaries** (self-contained, single-file, no
+runtime needed — Linux/Windows/macOS):
+
+```bash
+tools/publish-server.sh        # → ./dist/eliminated-server-<platform>[.exe]
+```
+
+Pushing a release tag (`v*`) runs `.github/workflows/release.yml`, which builds
+these and attaches them to the GitHub Release automatically. (Unity *client*
+installers — Windows / Linux / Steam Deck / Android / WebGL — are built by
+`unity.yml` once a `UNITY_LICENSE` secret is set.)
+
 ### Unity client
 
 Open `unity/EliminatedGame/` in **Unity Hub** with **Unity 6 LTS (6000.x)**.
