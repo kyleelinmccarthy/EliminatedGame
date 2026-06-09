@@ -17,9 +17,10 @@ by opening the project in Unity Hub.
 
 ## Current status
 
-- [x] Phase 0 — Foundation (in progress)
-- [ ] Phase 1 — Sim core + 3 games
-- [ ] Phase 2 — Unity vertical slice
+- [x] Phase 0 — Foundation (`dotnet test` green, CI wired)
+- [x] Phase 1 — Sim core + 3 games (88 headless tests green, incl. full-series E2E)
+- [x] Phase 2 — Unity vertical slice authored (code-driven, solo vs bots, 3 games,
+      menu→play→results, settings, local save) — *open in Unity 6 to verify visually*
 - [ ] Phase 3 — Breadth
 - [ ] Phase 4 — Local co-op
 - [ ] Phase 5 — Online

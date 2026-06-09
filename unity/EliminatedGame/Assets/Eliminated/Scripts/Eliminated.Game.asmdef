@@ -2,7 +2,8 @@
   "name": "Eliminated.Game",
   "rootNamespace": "Eliminated.Game",
   "references": [
-    "Eliminated.Sim"
+    "Eliminated.Sim",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

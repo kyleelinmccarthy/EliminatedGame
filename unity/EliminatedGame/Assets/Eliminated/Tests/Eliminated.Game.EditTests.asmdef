@@ -3,6 +3,7 @@
   "rootNamespace": "Eliminated.Game.Tests",
   "references": [
     "Eliminated.Sim",
+    "Eliminated.Game",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],

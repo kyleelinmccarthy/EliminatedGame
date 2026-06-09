@@ -36,18 +36,51 @@ assets are generated on your first open. Set and save these once:
   release builds (Mono is fine in-editor).
 - Commit the resulting `ProjectSettings/*.asset` so the next clone is configured.
 
+> **If Package Manager reports a version that doesn't exist** for your exact
+> editor patch, accept its offer to resolve to the nearest compatible version
+> (or delete the version string for that line and let it pick). The pinned
+> versions target Unity 6000.0 LTS and are intentionally a minimal set.
+
 ## 4. Packages added in later phases
 
-To keep early phases easy to open, networking/services packages are **not** in the
-manifest yet. They get added when their phase begins:
+To keep early phases easy to open, only the packages the current phase uses are
+in the manifest. Others are added when their phase begins:
 
+- **Phase 3 — Breadth/UX**: `com.unity.cinemachine`, `com.unity.localization`,
+  `com.unity.addressables`.
 - **Phase 5 — Online**: `com.unity.netcode.gameobjects`, `com.unity.transport`,
   `com.unity.services.relay`, `com.unity.services.lobby`,
   `com.unity.services.authentication`, `com.unity.services.core`.
 - **Phase 6 — Steam**: **Facepunch.Steamworks** (MIT) imported as a plugin DLL
   under `Assets/Plugins/`, plus a `steam_appid.txt` (git-ignored) for testing.
 
-## 5. Run
+## 5. Run the vertical slice (Phase 2)
 
-- Open `Assets/Eliminated/Scenes/Boot.unity` (added in Phase 2) and press Play.
-- Run tests via *Window → General → Test Runner* (EditMode + PlayMode).
+The slice is **fully code-driven** — there is no scene to set up. A
+`RuntimeInitializeOnLoadMethod` bootstrap (`GameBootstrapper`) builds the camera,
+arena, input, and UI on Play.
+
+1. Open any scene (an empty scene is fine — *File → New Scene → Empty*).
+2. *Project Settings → Player → Active Input Handling* = **Input System Package
+   (New)** (or *Both*).
+3. Press **Play**. The menu appears (IMGUI for the slice).
+4. Choose **Solo vs Bots — Casual** (or Hardcore). You play 4 rounds against bots
+   across Red Light Green Light, Tug of War, and Boomerang Brawl, then see the
+   results. Marbles you earn are saved to your local profile.
+
+### Controls (slice)
+
+| Action | Keyboard / Mouse | Gamepad |
+|---|---|---|
+| Move | WASD / Arrows | Left stick |
+| Aim (Boomerang) | Mouse | Right stick |
+| Throw / Mash / Jump | Space / Left-click | A (South) |
+| Dash | Shift | B (East) |
+
+> Colorblind palettes, subtitles, and volume are in the in-menu **Settings**.
+> Remappable controls arrive with the Input Actions asset in a later phase.
+
+## 6. Tests
+
+Run tests via *Window → General → Test Runner* (EditMode). The headless
+simulation suite also runs without Unity: `cd sim && dotnet test`.
