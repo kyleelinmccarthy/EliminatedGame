@@ -45,10 +45,22 @@ namespace Eliminated.Game.Audio
             if (loop != null) { _music.clip = loop; _music.Play(); }
         }
 
+        // Several cues use real CC0 sounds sourced from OpenGameArt (rubberduck,
+        // "100 CC0 SFX"; see Resources/Audio/oga/LICENSE.txt); the rest use our
+        // generated WAVs. Both go through Play() so swapping is one line each.
+        private static readonly Dictionary<string, string> Sourced = new Dictionary<string, string>
+        {
+            { "shatter", "oga/glass_01" },
+            { "chime", "oga/bell_02" },
+            { "drum", "oga/slam_03" },
+            { "catch", "oga/spring_07" },
+        };
+
         private AudioClip Load(string name)
         {
             if (_clips.TryGetValue(name, out var c)) return c;
-            c = Resources.Load<AudioClip>("Audio/" + name);
+            string path = Sourced.TryGetValue(name, out var oga) ? oga : name;
+            c = Resources.Load<AudioClip>("Audio/" + path);
             _clips[name] = c; // cache even nulls to avoid repeat lookups
             return c;
         }

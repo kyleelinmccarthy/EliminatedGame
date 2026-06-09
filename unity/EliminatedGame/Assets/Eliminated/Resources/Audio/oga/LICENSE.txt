@@ -1,0 +1,10 @@
+Real CC0 sound effects sourced from OpenGameArt (an approved asset source).
+
+Pack:   "100 CC0 SFX"
+Author: rubberduck
+License: CC0 1.0 (Creative Commons Zero / Public Domain) — no attribution required;
+         credited here and in the in-game Credits as a courtesy.
+Source: https://opengameart.org/content/100-cc0-sfx
+File:   https://opengameart.org/sites/default/files/100-CC0-SFX_0.zip
+
+These .ogg files are a curated subset used by AudioService for impact/UI cues.

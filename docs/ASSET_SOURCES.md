@@ -34,7 +34,8 @@ Attribution required by a license is reproduced here *and* in the in-game Credit
 
 | Asset (in-repo path) | Source | Author | License | URL |
 |---|---|---|---|---|
-| _(none yet — placeholders/primitives in use)_ | — | — | — | — |
+| `Resources/Audio/oga/*.ogg` (14 SFX) | OpenGameArt | rubberduck | CC0 1.0 | https://opengameart.org/content/100-cc0-sfx |
+| `Resources/Models/kenney/character-*.obj` (+ MTL + 1024² textures) | OpenGameArt / Kenney | Kenney (www.kenney.nl) | CC0 1.0 | https://opengameart.org/content/blocky-characters |
 
 ## Generated 3D model (shipped — our own output, no third-party license)
 
