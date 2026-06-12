@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Renders the Game Master ANNOUNCER voice bank — a male robot for game
+    announcements and a female robot for eliminations — as real 16-bit PCM WAV
+    files, mirroring the web build's browser-TTS Game Master (lib/client/audio.ts
+    speak()). Unity has no built-in speech synth, so instead of speaking at
+    runtime we pre-render a small fixed vocabulary once with espeak-ng (the
+    classic offline formant synthesizer — exactly the robotic PA timbre we want)
+    and ship the clips; the game just plays/queues WAVs (see Announcer.cs). This
+    is a BUILD-TIME tool only: espeak-ng is not a runtime/Unity dependency, and
+    speech-synth output is the user's data, not a derivative of the synthesizer
+    (no license is inherited). See docs/ASSET_SOURCES.md and the generated
+    VOICE_MANIFEST.md.
+
+    Run (espeak-ng must be on PATH), passing an output directory argument:
+      dotnet run, project tools/VoiceGen
+    Default output dir is the Unity Resources/Audio/voice folder.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Eliminated.Tools.VoiceGen</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -8,11 +8,12 @@ using Eliminated.Sim.Powerups;
 namespace Eliminated.Sim.Games
 {
     /// <summary>
-    /// Freeze Tag — 🔵 BLUE freezers ("it") chase 🩷 PINK runners. A touch freezes
-    /// a runner solid; a free runner thaws a frozen teammate, until the final
-    /// deep-freeze window. At the buzzer: frozen runners and freezers who caught
-    /// nobody are out (never the whole field). Ported from
-    /// lib/server/games/Tag.ts.
+    /// Freeze Tag — a FEW icy "it" freezers chase a CROWD of runners (classic freeze
+    /// tag, NOT even teams — being a runner should feel survivable, not a coin-flip).
+    /// One freezer per ~5 players, with a small speed edge so they can actually catch.
+    /// A touch freezes a runner solid; a free runner thaws a frozen one, until the final
+    /// deep-freeze window. At the buzzer: frozen runners and freezers who caught nobody
+    /// are out (never the whole field). Ported from lib/server/games/Tag.ts.
     /// </summary>
     public sealed class Tag : ArenaGame
     {
@@ -23,12 +24,19 @@ namespace Eliminated.Sim.Games
         private const float ThawImmune = 0.8f;
         private const int FreezerTeam = 0;
         private const int RunnerTeam = 1;
+        private const float FreezerSpeedEdge = 1.12f; // "it" is a touch faster (classic tag)
 
         private readonly PowerupField _powerups;
         private float _timer = RoundTime;
         private float _deepFreezeLen = 5f;
         private bool _deepFreeze;
         private bool _done;
+        private int _numFreezers;
+
+        /// <summary>How many "it" freezers for a field of <paramref name="n"/> — just ONE for a
+        /// small field, TWO once it's bigger, and never more than two (by design: a lone hunter or
+        /// a duo against the crowd). Their speed edge + proactive runner rescues keep it lively.</summary>
+        public static int FreezerCount(int n) => n <= 2 ? 1 : (n >= 7 ? 2 : 1);
 
         public Tag(GameContext ctx) : base(ctx)
         {
@@ -45,16 +53,22 @@ namespace Eliminated.Sim.Games
         {
             Elapsed = 0f;
             var shuffled = Rng.Shuffle(Actors);
+            _numFreezers = Math.Min(shuffled.Count - 1, FreezerCount(shuffled.Count));
+            if (_numFreezers < 1) _numFreezers = Math.Min(1, shuffled.Count);
             for (int i = 0; i < shuffled.Count; i++)
             {
                 var a = shuffled[i];
-                int team = i % 2;
+                bool freezer = i < _numFreezers;     // the first few are "it"; the rest run
+                int team = freezer ? FreezerTeam : RunnerTeam;
                 a.Team = team;
-                a.It = team == FreezerTeam;
-                float side = team == FreezerTeam ? 0.3f : 0.7f;
-                a.Pos = new Vec2(
-                    Constants.ArenaW * side + (Rng.NextFloat() - 0.5f) * Constants.ArenaW * 0.42f,
-                    Constants.ArenaH * (0.12f + Rng.NextFloat() * 0.76f));
+                a.It = freezer;
+                // Freezers start spread across the middle; runners scatter to the edges so
+                // there's breathing room (no instant 50/50 clash).
+                a.Pos = freezer
+                    ? new Vec2(Constants.ArenaW * (0.32f + Rng.NextFloat() * 0.36f),
+                               Constants.ArenaH * (0.30f + Rng.NextFloat() * 0.40f))
+                    : new Vec2(Constants.ArenaW * (0.08f + Rng.NextFloat() * 0.84f),
+                               Constants.ArenaH * (0.10f + Rng.NextFloat() * 0.80f));
                 a.Frozen = false;
                 a.Set("freezeCd", 0f);
                 a.Set("immune", 0f);
@@ -63,6 +77,11 @@ namespace Eliminated.Sim.Games
             }
             _deepFreezeLen = 3.5f + Ctx.Intensity * 4.5f;
         }
+
+        // The few "it" freezers move a touch faster so a lone hunter can actually run a
+        // fleeing runner down; runners keep base speed.
+        protected override float RoleSpeedMul(Actor a)
+            => a.Alive && a.Team == FreezerTeam ? FreezerSpeedEdge : 1f;
 
         private List<Actor> Alive => Actors.Where(a => a.Alive).ToList();
         private int FreeRunners => Actors.Count(a => a.Alive && a.Team == RunnerTeam && !a.Frozen);
@@ -189,16 +208,26 @@ namespace Eliminated.Sim.Games
                 return;
             }
 
+            // RUNNER. Rescuing frozen friends is the heart of the game, so be PROACTIVE about it:
+            // go thaw a frozen teammate whenever you're not in a freezer's face (or it's a quick grab),
+            // rather than only when the rescue happens to be nearer than the threat.
             var threat = Nearest(a, alive.Where(o => o.Team == FreezerTeam));
-            var rescue = Nearest(a, alive.Where(o => o.Team == RunnerTeam && o.Frozen && o != a));
-            if (!_deepFreeze && rescue != null && threat != null &&
-                Vec2.Distance(a.Pos, rescue.Pos) < Vec2.Distance(a.Pos, threat.Pos))
+            float threatD = threat != null ? Vec2.Distance(a.Pos, threat.Pos) : float.MaxValue;
+            var frozenMate = Nearest(a, alive.Where(o => o.Team == RunnerTeam && o.Frozen && o != a));
+            if (!_deepFreeze && frozenMate != null)
             {
-                var d = (rescue.Pos - a.Pos).Normalized;
-                a.InDx = d.X; a.InDy = d.Y;
-                return;
+                float rescueD = Vec2.Distance(a.Pos, frozenMate.Pos);
+                var guard = Nearest(frozenMate, alive.Where(o => o.Team == FreezerTeam));
+                bool guarded = guard != null && Vec2.Distance(frozenMate.Pos, guard.Pos) < 95f;
+                if ((threatD > 150f && !guarded) || rescueD < 90f) // safe to go, or a quick brave grab
+                {
+                    var dr = (frozenMate.Pos - a.Pos).Normalized;
+                    a.InDx = dr.X; a.InDy = dr.Y;
+                    return;
+                }
             }
-            if (threat != null)
+            // Flee only when a freezer is actually closing in (otherwise mill / patrol).
+            if (threat != null && threatD < 250f)
             {
                 var d = (a.Pos - threat.Pos).Normalized;
                 float weave = (float)Math.Sin(Elapsed * 1.8f + a.Get("roam")) * 0.5f;
@@ -270,6 +299,7 @@ namespace Eliminated.Sim.Games
                 Frozen = alive.Count(a => a.Team == RunnerTeam && a.Frozen),
                 FreezersAlive = alive.Count(a => a.Team == FreezerTeam),
                 RunnersAlive = alive.Count(a => a.Team == RunnerTeam),
+                FreezerTeamId = FreezerTeam,
                 Night = Ctx.Night,
                 Pickups = _powerups.Snapshot()
             };
@@ -282,6 +312,7 @@ namespace Eliminated.Sim.Games
             public int Frozen;
             public int FreezersAlive;
             public int RunnersAlive;
+            public int FreezerTeamId; // which Team value is "it" (so the view/HUD can tag YOUR role)
             public bool Night;
             public List<PickupView> Pickups;
         }

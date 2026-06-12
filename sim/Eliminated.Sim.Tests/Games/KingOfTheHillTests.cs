@@ -10,13 +10,16 @@ namespace Eliminated.Sim.Tests.Games
     public class KingOfTheHillTests
     {
         private static KingOfTheHill Make(List<Actor> actors, int seed, bool forceSingle = true)
+            => Make(actors, seed, isFinale: true, forceSingle: forceSingle, intensity: 0.9f);
+
+        private static KingOfTheHill Make(List<Actor> actors, int seed, bool isFinale, bool forceSingle, float intensity)
         {
             var ctx = new GameContext
             {
                 Rng = new Rng(seed),
                 Actors = actors,
-                Intensity = 0.9f,
-                IsFinale = true,
+                Intensity = intensity,
+                IsFinale = isFinale,
                 ForceSingleSurvivor = forceSingle
             };
             var g = new KingOfTheHill(ctx);
@@ -39,14 +42,29 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
-        public void A_blob_stranded_in_lava_burns_out()
+        public void Regular_round_culls_toward_a_target_without_wiping_the_field()
+        {
+            // Not a finale: should leave several survivors, never collapse to one.
+            var actors = Enumerable.Range(0, 12).Select(i => new Actor { Id = "b" + i, IsBot = true }).ToList();
+            var g = Make(actors, seed: 7, isFinale: false, forceSingle: false, intensity: 0.3f);
+            int ticks = 0;
+            while (!g.IsDone && ticks < 61 * 20) { g.Tick(Constants.Dt); ticks++; }
+            Assert.True(g.IsDone);
+            var r = g.Result();
+            Assert.True(r.SurvivorIds.Count > 1, $"expected multiple survivors, got {r.SurvivorIds.Count}");
+            Assert.Equal(12, r.Ranking.Count);
+        }
+
+        [Fact]
+        public void A_player_stranded_in_lava_burns_out()
         {
             var actors = Enumerable.Range(0, 4).Select(i => new Actor { Id = "h" + i, IsBot = false }).ToList();
             var g = Make(actors, seed: 1);
             var victim = actors[0];
             victim.Pos = new Vec2(40, 40); // corner — guaranteed lava
 
-            for (int i = 0; i < 30 && victim.Alive; i++) g.Tick(Constants.Dt); // ~1.5s > burn grace
+            // ~5s: past the 2.5s opening spawn-grace AND the 0.95s burn grace once it bites.
+            for (int i = 0; i < 100 && victim.Alive; i++) g.Tick(Constants.Dt);
             Assert.False(victim.Alive);
         }
 
@@ -54,7 +72,7 @@ namespace Eliminated.Sim.Tests.Games
         public void A_shove_launches_a_rival_away()
         {
             var actors = new List<Actor> { new Actor { Id = "a" }, new Actor { Id = "b" } };
-            // 2 actors → would normally be last-blob-protected; place them together.
+            // 2 actors → would normally be last-player-protected; place them together.
             var g = Make(actors, seed: 1, forceSingle: false);
             var a = actors[0]; var b = actors[1];
             a.Pos = new Vec2(640, 360);

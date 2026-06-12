@@ -4,7 +4,7 @@ using Eliminated.Sim.Core;
 namespace Eliminated.Sim.Model
 {
     /// <summary>
-    /// A blob participating in the active minigame. Holds transform, input intent,
+    /// A player participating in the active minigame. Holds transform, input intent,
     /// gameplay state, powerup status timers, and a per-game scratch bag. Ported
     /// from the reference Actor (lib/server/games/Minigame.ts).
     /// </summary>
@@ -13,6 +13,7 @@ namespace Eliminated.Sim.Model
         public string Id;
         public string Name;
         public string CharacterId;
+        public List<string> Accessories; // worn cosmetic ids (view only); copied from Player.Accessories
         public int Number;          // Squid-game style tag 1..456 (view only)
         public bool IsBot;
 

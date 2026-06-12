@@ -20,11 +20,13 @@ namespace Eliminated.Sim.Core
             "Pretzel", "Mochi"
         };
 
-        /// <summary>Free starter character ids (subset of the cosmetic roster).</summary>
+        /// <summary>Character ids bots can wear. Restricted to ids that resolve to real
+        /// art (CharacterArt.Map) so bots never spawn as the bare procedural player — the
+        /// food/fruit roster (avo, egg, donut, …) has no bespoke art yet.</summary>
         public static readonly string[] Characters =
         {
-            "koala", "fox", "panther", "bunny", "cat", "avo", "egg", "berry",
-            "donut", "pickle", "tomato", "sushi", "nana", "slime", "ghost", "capybara"
+            "koala", "fox", "panther", "cat", "capybara", "aardvark", "cow", "owl",
+            "snowowl", "demon", "devil", "sheep", "slime", "ninja", "rogue", "sorcerer"
         };
 
         public static string Random(Rng rng) => $"{rng.Pick(First)} {rng.Pick(Last)}";

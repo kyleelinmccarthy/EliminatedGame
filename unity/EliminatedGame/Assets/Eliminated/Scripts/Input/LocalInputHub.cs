@@ -4,6 +4,8 @@ using Eliminated.Sim.Model;
 using Eliminated.Game.Net;
 using Eliminated.Game.SimBridge;
 using Eliminated.Game.View;
+using Eliminated.Game.Save;
+using Eliminated.Game.Audio;
 
 namespace Eliminated.Game.Input
 {
@@ -39,12 +41,52 @@ namespace Eliminated.Game.Input
                 var c = ReadControls(i, coop, game);
                 _sim.SubmitFor(ids[i], GameInput.Move(c.Dx, c.Dy));
                 if (c.Primary)
-                    _sim.SubmitFor(ids[i], game == GameId.Boomerang ? GameInput.Action("throw") : GameInput.Tap());
+                {
+                    // The primary button is a DIFFERENT action per game — sending a bare Tap()
+                    // (the old behaviour) silently did nothing in Dodgeball/KotH/Prop Hunt, so a
+                    // human could never throw / shove / swing. Route the correct one.
+                    string act = PrimaryActionFor(game);
+                    _sim.SubmitFor(ids[i], act != null ? GameInput.Action(act) : GameInput.Tap());
+                    // Instant audible feedback so mashing FEELS like it's doing something (esp. Tug,
+                    // where the rope only reflects NET force and a tap can otherwise feel eaten).
+                    if (game == GameId.TugOfWar) AudioService.Instance?.Play("drum", 0.3f);
+                }
                 if (c.Dash) _sim.SubmitFor(ids[i], GameInput.Action("dash"));
-                if (game == GameId.Boomerang && c.HasAim) _sim.SubmitFor(ids[i], GameInput.Aim(c.Aim));
+                if (c.HasAim) _sim.SubmitFor(ids[i], GameInput.Aim(c.Aim)); // only set for the aim games
                 if (i == 0) HandleDiscreteChoices(ids[0], game); // keyboard player drives Choose-games
             }
         }
+
+        // Current keyboard bindings (player 0), falling back to WASD/Space/Shift.
+        private static GameSettings Binds => SaveService.Current?.settings;
+        private static Key Up => Binds?.keyUp ?? Key.W;
+        private static Key Down => Binds?.keyDown ?? Key.S;
+        private static Key Left => Binds?.keyLeft ?? Key.A;
+        private static Key Right => Binds?.keyRight ?? Key.D;
+        private static Key Action => Binds?.keyAction ?? Key.Space;
+        private static Key Dash => Binds?.keyDash ?? Key.LeftShift;
+
+        private static bool Held(Keyboard kb, Key k) => k != Key.None && kb[k].isPressed;
+        private static bool Hit(Keyboard kb, Key k) => k != Key.None && kb[k].wasPressedThisFrame;
+
+        /// <summary>The game-specific action the PRIMARY button fires (null = a bare Tap, which
+        /// Keepy-Uppy's spike / Jump Rope's jump / Tug's pull all consume).</summary>
+        private static string PrimaryActionFor(GameId g)
+        {
+            switch (g)
+            {
+                case GameId.Boomerang:
+                case GameId.Dodgeball: return "throw";
+                case GameId.KingOfTheHill: return "shove";
+                case GameId.PropHunt: return "swing";
+                default: return null;
+            }
+        }
+
+        /// <summary>Games where the primary action is AIMED (mouse / right-stick).</summary>
+        private static bool UsesAim(GameId g) =>
+            g == GameId.Boomerang || g == GameId.Dodgeball ||
+            g == GameId.KingOfTheHill || g == GameId.KeepyUppy;
 
         /// <summary>Keyboard → discrete `Choose` inputs for the turn/timing games.</summary>
         private void HandleDiscreteChoices(string pid, GameId game)
@@ -54,16 +96,20 @@ namespace Eliminated.Game.Input
             switch (game)
             {
                 case GameId.GlassBridge:
+                    // The two panes are the TOP and BOTTOM lanes of the bridge, so pick with up/down.
+                    if (kb.upArrowKey.wasPressedThisFrame || Hit(kb, Up)) _sim.SubmitFor(pid, GameInput.Choose("L"));    // top pane (side 0)
+                    if (kb.downArrowKey.wasPressedThisFrame || Hit(kb, Down)) _sim.SubmitFor(pid, GameInput.Choose("R")); // bottom pane (side 1)
+                    break;
                 case GameId.ChutesAndLadders:
-                    if (kb.leftArrowKey.wasPressedThisFrame || kb.aKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("L"));
-                    if (kb.rightArrowKey.wasPressedThisFrame || kb.dKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("R"));
+                    if (kb.leftArrowKey.wasPressedThisFrame || Hit(kb, Left)) _sim.SubmitFor(pid, GameInput.Choose("L"));
+                    if (kb.rightArrowKey.wasPressedThisFrame || Hit(kb, Right)) _sim.SubmitFor(pid, GameInput.Choose("R"));
                     break;
                 case GameId.SimonSays:
-                    if (kb.wKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("head"));
-                    if (kb.aKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("nose"));
-                    if (kb.sKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("blink"));
-                    if (kb.dKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("flip"));
-                    if (kb.spaceKey.wasPressedThisFrame) _sim.SubmitFor(pid, GameInput.Choose("jump"));
+                    if (Hit(kb, Up)) _sim.SubmitFor(pid, GameInput.Choose("head"));
+                    if (Hit(kb, Left)) _sim.SubmitFor(pid, GameInput.Choose("nose"));
+                    if (Hit(kb, Down)) _sim.SubmitFor(pid, GameInput.Choose("blink"));
+                    if (Hit(kb, Right)) _sim.SubmitFor(pid, GameInput.Choose("flip"));
+                    if (Hit(kb, Action)) _sim.SubmitFor(pid, GameInput.Choose("jump"));
                     break;
             }
         }
@@ -79,18 +125,18 @@ namespace Eliminated.Game.Input
                 var kb = Keyboard.current;
                 if (kb != null)
                 {
-                    if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) c.Dx += 1f;
-                    if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) c.Dx -= 1f;
-                    if (kb.wKey.isPressed || kb.upArrowKey.isPressed) c.Dy -= 1f;
-                    if (kb.sKey.isPressed || kb.downArrowKey.isPressed) c.Dy += 1f;
-                    c.Primary |= kb.spaceKey.wasPressedThisFrame;
-                    c.Dash |= kb.leftShiftKey.wasPressedThisFrame || kb.rightShiftKey.wasPressedThisFrame;
+                    if (Held(kb, Right) || kb.rightArrowKey.isPressed) c.Dx += 1f;
+                    if (Held(kb, Left) || kb.leftArrowKey.isPressed) c.Dx -= 1f;
+                    if (Held(kb, Up) || kb.upArrowKey.isPressed) c.Dy -= 1f;
+                    if (Held(kb, Down) || kb.downArrowKey.isPressed) c.Dy += 1f;
+                    c.Primary |= Hit(kb, Action);
+                    c.Dash |= Hit(kb, Dash) || kb.rightShiftKey.wasPressedThisFrame;
                 }
                 var mouse = Mouse.current;
                 if (mouse != null)
                 {
                     c.Primary |= mouse.leftButton.wasPressedThisFrame;
-                    if (game == GameId.Boomerang && _arena != null)
+                    if (UsesAim(game) && _arena != null)
                     {
                         var local = _sim.ActorFor(_sim.LocalPlayerIds[index]);
                         if (local != null && _arena.TryScreenToLogical(mouse.position.ReadValue(), out var lg))
@@ -110,7 +156,7 @@ namespace Eliminated.Game.Input
                 c.Primary |= pad.buttonSouth.wasPressedThisFrame;
                 c.Dash |= pad.buttonEast.wasPressedThisFrame;
                 var rs = pad.rightStick.ReadValue();
-                if (game == GameId.Boomerang && rs.sqrMagnitude > 0.12f)
+                if (UsesAim(game) && rs.sqrMagnitude > 0.12f)
                 {
                     c.HasAim = true;
                     c.Aim = Mathf.Atan2(-rs.y, rs.x);

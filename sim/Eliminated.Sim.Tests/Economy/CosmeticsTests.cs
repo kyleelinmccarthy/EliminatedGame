@@ -8,10 +8,10 @@ namespace Eliminated.Sim.Tests.Economy
     public class CosmeticsTests
     {
         [Fact]
-        public void Roster_has_38_characters_with_28_free()
+        public void Roster_has_45_characters_with_30_free()
         {
-            Assert.Equal(38, Cosmetics.Characters.Length);
-            Assert.Equal(28, Cosmetics.Characters.Count(c => c.UnlockCost == 0));
+            Assert.Equal(45, Cosmetics.Characters.Length);
+            Assert.Equal(30, Cosmetics.Characters.Count(c => c.UnlockCost == 0));
         }
 
         [Fact]

@@ -14,7 +14,7 @@ namespace Eliminated.Sim.Tests.Model
             Assert.True(c.Rounds.Mystery);
             Assert.Empty(c.AllowedGames);
             Assert.True(c.BotFill);
-            Assert.Equal(8, c.MaxPlayers);
+            Assert.Equal(12, c.MaxPlayers);
             Assert.True(c.FriendlyFire);
             Assert.False(c.NightMode);
         }

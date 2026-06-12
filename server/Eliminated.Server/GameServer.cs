@@ -33,7 +33,7 @@ namespace Eliminated.Server
             public Guid Id;
             public WebSocket Ws;
             public readonly Channel<OutMsg> Out = Channel.CreateUnbounded<OutMsg>();
-            public string PlayerId, Name = "Blob", CharacterId = "avo", RoomCode, LastRoomJson;
+            public string PlayerId, Name = "Player", CharacterId = "avo", RoomCode, LastRoomJson;
         }
 
         private readonly int _port;
@@ -211,6 +211,9 @@ namespace Eliminated.Server
                 phase = room.Phase.ToString(),
                 round = room.RoundIndex,
                 game = room.CurrentGame?.ToString(),
+                // Lets the client play the finale music + announcer cue online. Just a
+                // bool, so Mystery mode never leaks the hidden total-round count.
+                finalGame = room.IsFinalGame,
                 youAre,
                 isHost = room.HostId == youAre,
                 players = room.Players.Select(p => new { p.Id, p.Name, p.Number, alive = p.AliveInSeries, bot = p.IsBot, p.MarblesEarned }).ToList(),
@@ -236,7 +239,7 @@ namespace Eliminated.Server
             switch (t)
             {
                 case "hello":
-                    conn.Name = Str(root, "name", "Blob");
+                    conn.Name = Str(root, "name", "Player");
                     conn.CharacterId = Str(root, "characterId", "avo");
                     conn.PlayerId = "c_" + connId.ToString("N").Substring(0, 8);
                     Send(conn, JsonSerializer.Serialize(new { t = "welcome", playerId = conn.PlayerId }, _json));

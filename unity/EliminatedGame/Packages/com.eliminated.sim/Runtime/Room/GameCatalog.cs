@@ -62,7 +62,7 @@ namespace Eliminated.Sim.Room
             {
                 Id = GameId.KingOfTheHill, Name = "King of the Lava Islands", Icon = "🌋",
                 MinPlayers = 2, RequiresEven = false, Cull = CullStrength.High,
-                Finale = true, FinaleCapable = true, Nightable = true,
+                FinaleCapable = true, Nightable = true,
                 Factory = ctx => new KingOfTheHill(ctx)
             },
             [GameId.Dodgeball] = new GameMeta
@@ -99,7 +99,7 @@ namespace Eliminated.Sim.Room
             },
             [GameId.RpsMinusOne] = new GameMeta
             {
-                Id = GameId.RpsMinusOne, Name = "RPS Minus One", Icon = "✊",
+                Id = GameId.RpsMinusOne, Name = "RPS Minus One", Icon = "✊✋✌️",
                 MinPlayers = 2, RequiresEven = true, Cull = CullStrength.High,
                 FinaleCapable = true,
                 Factory = ctx => new RpsMinusOne(ctx)
@@ -113,7 +113,7 @@ namespace Eliminated.Sim.Room
             // ── Extras (secondary rotation) ──────────────────────────────
             [GameId.PropHunt] = new GameMeta
             {
-                Id = GameId.PropHunt, Name = "Prop Hunt", Icon = "🪑",
+                Id = GameId.PropHunt, Name = "Prop Hunt", Icon = "🗡️",
                 MinPlayers = 3, RequiresEven = false, Cull = CullStrength.Mid, Nightable = true,
                 Factory = ctx => new PropHunt(ctx)
             },
@@ -126,13 +126,13 @@ namespace Eliminated.Sim.Room
             },
             [GameId.ChutesAndLadders] = new GameMeta
             {
-                Id = GameId.ChutesAndLadders, Name = "Chutes & Ladders", Icon = "🎲",
+                Id = GameId.ChutesAndLadders, Name = "Chutes & Ladders", Icon = "🪜",
                 MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
                 Factory = ctx => new ChutesAndLadders(ctx)
             },
             [GameId.SimonSays] = new GameMeta
             {
-                Id = GameId.SimonSays, Name = "Simon Says", Icon = "🎵",
+                Id = GameId.SimonSays, Name = "Simon Says", Icon = "🙆",
                 MinPlayers = 2, RequiresEven = false, Cull = CullStrength.Mid,
                 FinaleCapable = true,
                 Factory = ctx => new SimonSays(ctx)

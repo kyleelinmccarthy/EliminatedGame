@@ -27,6 +27,9 @@ namespace Eliminated.Sim.Powerups
         public int Id;
         public string Kind;
         public float X, Y, Bob;
+        public bool Good; // beneficial (green) vs curse (red) — set at build time so the view
+                          // needn't parse Kind (which fails for game-specific powerups like
+                          // Boomerang's BigRang/Multishot/Magnet, wrongly drawing them red)
     }
 
     /// <summary>
@@ -158,7 +161,7 @@ namespace Eliminated.Sim.Powerups
         {
             var list = new List<PickupView>(_pickups.Count);
             foreach (var p in _pickups)
-                list.Add(new PickupView { Id = p.Id, Kind = p.Kind.ToString(), X = p.X, Y = p.Y, Bob = p.Bob });
+                list.Add(new PickupView { Id = p.Id, Kind = p.Kind.ToString(), X = p.X, Y = p.Y, Bob = p.Bob, Good = PowerupEffects.IsGood(p.Kind) });
             return list;
         }
 

@@ -21,11 +21,11 @@ needed): several local humans, one `GameRoom`, bots fill the rest.
    device and call `room.HandleInput("local_"+i, …)`. Reuse the existing
    game-aware mapping.
 4. **View:** unchanged — `ArenaView` already renders all actors. Add a small
-   "P1/P2…" marker over each local player's blob (color by `Palette.Team`/index).
+   "P1/P2…" marker over each local player's player (color by `Palette.Team`/index).
 5. **Lobby UI:** show join prompts; Start once ≥1 human present (bot-fill covers
    the rest, exactly like solo).
 6. **Verify:** two gamepads, one screen, a full series; both players' inputs move
-   their own blobs.
+   their own players.
 
 ---
 
@@ -77,11 +77,11 @@ host runs the authoritative `GameRoom`. The `Wire` codec
 9. **Dedicated server (optional follow-up):** the same `SimHost` in a headless
    build; clients connect via a direct `UnityTransport` endpoint instead of Relay.
 10. **Verify:** two editor/players, one enters the other's code, a full series
-    runs with both controlling their blobs; kill/rejoin mid-series.
+    runs with both controlling their players; kill/rejoin mid-series.
 
 > **Interpolation:** the client already renders ~1 snapshot behind via
-> `BlobView`'s smoothing. At 20 Hz this is smooth; add client-side prediction for
-> the local blob only if the movement games feel laggy under real latency.
+> `PlayerView`'s smoothing. At 20 Hz this is smooth; add client-side prediction for
+> the local player only if the movement games feel laggy under real latency.
 
 ---
 
@@ -136,7 +136,7 @@ host runs the authoritative `GameRoom`. The `Wire` codec
 5. **Audio:** swap generated SFX for curated CC0 sets (see
    [ASSET_SOURCES.md](ASSET_SOURCES.md)); AudioMixer buses already planned in
    settings; add a Game Master VO pass (recorded or TTS) with captions.
-6. **Real art:** replace placeholder blob spheres with 3D blob models
+6. **Real art:** replace placeholder player spheres with 3D player models
    (blendswap/TurboSquid-sourced) + the 6 themed arenas; track every asset's
    license in ASSET_SOURCES.md.
 7. **Store/release:** Steam store page + capsule art; age-rating questionnaires

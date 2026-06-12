@@ -130,6 +130,7 @@ namespace Eliminated.Sim.Games
                 UpdateStatus(a, dt);
                 if (a.Get("spikeT") > 0f) a.Set("spikeT", Math.Max(0f, a.Get("spikeT") - dt));
                 if (a.Get("spikeCd") > 0f) a.Set("spikeCd", Math.Max(0f, a.Get("spikeCd") - dt));
+                a.Progress = a.Get("spikeT") > 0f ? MathUtil.Clamp01(a.Get("spikeT") / SpikeDur) : 0f; // drives the spike-pin view
                 if (a.IsBot) BotThink(a, dt);
 
                 if (a.Get("spikeT") > 0f && a.DashT <= 0f) MoveAt(a, dt, SpikeLunge);
@@ -235,9 +236,11 @@ namespace Eliminated.Sim.Games
             if (owner != null && owner.Alive && AliveCount <= 1) { Rescue(b); return; }
             b.Popped = true;
             Emit(new Effect(EffectKind.Shatter, b.X, b.Y));
+            Emit(new Effect(EffectKind.Spark, b.X, b.Y, 1.4f));   // bold colored burst on the pop
             if (owner != null && owner.Alive)
             {
                 owner.InDx = 0f; owner.InDy = 0f;
+                Emit(new Effect(EffectKind.Splat, owner.Pos.X, owner.Pos.Y)); // satisfying splat on elimination
                 Eliminate(owner, note);
             }
         }

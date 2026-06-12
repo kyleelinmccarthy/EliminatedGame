@@ -18,5 +18,21 @@ namespace Eliminated.Game.Net
         IReadOnlyList<string> LocalPlayerIds { get; }
         void SubmitFor(string playerId, GameInput input);
         Actor ActorFor(string playerId);
+
+        // ── Room/session state the HUD renders, independent of backend ──
+        // Local play sources these from the in-process GameRoom; online play from
+        // the authoritative server's room message. Exposing them here lets the HUD,
+        // intro, and results screens render identically for both.
+        GameId? CurrentGame { get; }
+        int RoundIndex { get; }
+        /// <summary>True when the current round is the series finale (last scheduled round, or
+        /// any Hardcore overtime round past it). Drives the finale music cue. Online play
+        /// reports false — the server room message carries no total-round count.</summary>
+        bool IsFinalGame { get; }
+        bool PlayStarted { get; }
+        string ChampionId { get; }
+        RoundReport LastRoundReport { get; }
+        SeriesResult SeriesResult { get; }
+        string NameOf(string playerId);
     }
 }

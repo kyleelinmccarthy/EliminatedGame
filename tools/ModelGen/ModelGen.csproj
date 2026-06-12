@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Generates a blob character mesh as a real Wavefront OBJ (our own procedural
+    Generates a player character mesh as a real Wavefront OBJ (our own procedural
     geometry, no third-party license; see docs/ASSET_SOURCES.md). Unity imports
     OBJ natively. Run with: dotnet run then pass an output directory.
   -->

@@ -1,10 +1,11 @@
-// Online client. Guarded by the ELIMINATED_ONLINE scripting-define symbol so the
-// default build (which has no networking packages required) is unaffected. Enable
-// by adding ELIMINATED_ONLINE to Player → Scripting Define Symbols. It talks the
-// same protocol as the verified headless server (server/Eliminated.Server) and the
-// same Wire codec, so it also works against a Unity-Relay host that bridges to it.
-// See docs/IMPLEMENTATION_GUIDE.md Phase 5.
-#if ELIMINATED_ONLINE
+// Online client. Talks the same protocol as the verified headless server
+// (server/Eliminated.Server) over WebSockets, using the same Wire codec, so it
+// also works against a Unity-Relay host that bridges to it. Control messages are
+// JSON text frames; input/snapshots are binary frames (tag byte 1 = input,
+// 2 = snapshot). See docs/IMPLEMENTATION_GUIDE.md Phase 5.
+//
+// Note: ClientWebSocket is supported on desktop/IL2CPP (the Steam target) but not
+// WebGL — a WebGL build needs a JS WebSocket transport behind this same surface.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -24,14 +25,35 @@ namespace Eliminated.Game.Net
     /// Connects to the authoritative server over WebSockets and exposes its
     /// snapshots/room-state through <see cref="ISnapshotSource"/>, so the existing
     /// ArenaView/LocalInputHub/TouchControls render and drive online play
-    /// unchanged. (Per-game Snapshot.Data decoding for props/discrete HUDs is the
-    /// one remaining TODO — blobs already render; see DecodeData note below.)
+    /// unchanged. The server already serializes per-round and final standings into
+    /// the room message, so the HUD's intro/results screens render online too.
     /// </summary>
     public sealed class NetClient : MonoBehaviour, ISnapshotSource
     {
+        /// <summary>Where the connection is in its lifecycle (for the lobby UI).</summary>
+        public enum LinkState { Idle, Connecting, Online, Failed }
+
+        /// <summary>One roster row for the lobby list.</summary>
+        public struct LobbyPlayer { public string Name; public bool Bot; public bool IsYou; public int Number; }
+
+        // ── JSON shapes, matching GameServer.BuildRoomJson exactly (field names
+        //    are case-sensitive for JsonUtility). ──
         [Serializable] private class Welcome { public string t, playerId; }
-        [Serializable] private class Created { public string t, code; }
-        [Serializable] private class RoomMsg { public string t, code, phase, game, youAre, champion; public int round; }
+        [Serializable] private class ErrorMsg { public string t, msg; }
+        [Serializable] private class NetPlayer { public string Id, Name; public int Number; public bool alive, bot; public int MarblesEarned; }
+        [Serializable] private class NetRankEntry { public string PlayerId; public int Placement; public bool Survived; public int marbles; public string Note; }
+        [Serializable] private class NetLastRound { public string game; public int number; public NetRankEntry[] entries; }
+        [Serializable] private class NetStanding { public string PlayerId; public int Placement; public int Marbles; public int RoundsSurvived; public string Title; }
+        [Serializable] private class RoomMsg
+        {
+            public string t, code, phase, game, youAre, champion;
+            public int round;
+            public bool isHost;
+            public bool finalGame;
+            public NetPlayer[] players;
+            public NetLastRound lastRound;
+            public NetStanding[] standings;
+        }
 
         private ClientWebSocket _ws;
         private CancellationTokenSource _cts;
@@ -41,26 +63,108 @@ namespace Eliminated.Game.Net
         private volatile Snapshot _latest;
 
         public string PlayerId { get; private set; }
-        public string LastCode { get; private set; }
+        public LinkState State { get; private set; } = LinkState.Idle;
+        public string LastError { get; private set; }
 
+        // ── ISnapshotSource: snapshot/identity ──
         public bool HasSeries => _room != null;
         public RoomPhase Phase => Enum.TryParse<RoomPhase>(_room?.phase ?? "Lobby", out var p) ? p : RoomPhase.Lobby;
         public Snapshot Latest => _latest;
         public IReadOnlyList<string> LocalPlayerIds => _localIds;
 
+        // ── ISnapshotSource: room/session state (from the server's room message) ──
+        public GameId? CurrentGame
+            => Enum.TryParse<GameId>(_room?.game ?? "", out var g) ? (GameId?)g : null;
+        public int RoundIndex => _room?.round ?? 0;
+        // The server sends a `finalGame` bool in the room message (computed from the
+        // authoritative GameRoom, and mystery-safe), so the finale music + "The final
+        // game…" announcer fire online exactly as they do in local play.
+        public bool IsFinalGame => _room?.finalGame ?? false;
+        // The server nulls StartAt in the snapshot once the GO hold ends; only
+        // meaningful while Playing (no snapshots are sent during other phases).
+        public bool PlayStarted => Phase == RoomPhase.Playing && _latest != null && _latest.StartAt == null;
+        public string ChampionId => _room?.champion;
+
+        public string NameOf(string playerId)
+        {
+            var r = _room;
+            if (r?.players != null)
+                foreach (var p in r.players)
+                    if (p.Id == playerId) return p.Name;
+            return playerId;
+        }
+
+        // Results are rebuilt only when the room message changes (cheap, but avoids
+        // re-allocating every OnGUI frame during the result screens).
+        private RoomMsg _resultsFor;
+        private RoundReport _reportCache;
+        private SeriesResult _seriesCache;
+
+        public RoundReport LastRoundReport { get { RebuildResults(); return _reportCache; } }
+        public SeriesResult SeriesResult { get { RebuildResults(); return _seriesCache; } }
+
+        // ── Lobby helpers ──
+        public bool InRoom => _room != null;
+        public bool IsHost => _room?.isHost ?? false;
+        public string RoomCode => _room?.code;
+        public int PlayerCount => _room?.players?.Length ?? 0;
+
+        public LobbyPlayer[] Roster()
+        {
+            var r = _room;
+            var ps = r?.players;
+            if (ps == null) return Array.Empty<LobbyPlayer>();
+            var list = new LobbyPlayer[ps.Length];
+            for (int i = 0; i < ps.Length; i++)
+                list[i] = new LobbyPlayer { Name = ps[i].Name, Bot = ps[i].bot, IsYou = ps[i].Id == PlayerId, Number = ps[i].Number };
+            return list;
+        }
+
+        // ── Connection lifecycle ──
         public async void Connect(string url, string name, string characterId)
         {
+            LastError = null;
+            State = LinkState.Connecting;
             _cts = new CancellationTokenSource();
             _ws = new ClientWebSocket();
-            await _ws.ConnectAsync(new Uri(url), _cts.Token);
-            _ = ReceiveLoop(_cts.Token);
-            await SendText($"{{\"t\":\"hello\",\"name\":\"{Esc(name)}\",\"characterId\":\"{Esc(characterId)}\"}}");
+            try
+            {
+                await _ws.ConnectAsync(new Uri(url), _cts.Token);
+                _ = ReceiveLoop(_cts.Token);
+                await SendText($"{{\"t\":\"hello\",\"name\":\"{Esc(name)}\",\"characterId\":\"{Esc(characterId)}\"}}");
+            }
+            catch (Exception e)
+            {
+                State = LinkState.Failed;
+                LastError = e.Message;
+            }
         }
 
         public async void HostRoom(string mode, int rounds) => await SendText($"{{\"t\":\"createRoom\",\"mode\":\"{mode}\",\"rounds\":{rounds}}}");
-        public async void JoinByCode(string code) => await SendText($"{{\"t\":\"joinRoom\",\"code\":\"{Esc(code)}\"}}");
+        public async void JoinByCode(string code) { LastError = null; await SendText($"{{\"t\":\"joinRoom\",\"code\":\"{Esc(code)}\"}}"); }
         public async void AddBot() => await SendText("{\"t\":\"addBot\"}");
         public async void StartSeries() => await SendText("{\"t\":\"startSeries\"}");
+
+        /// <summary>Leave the current room but stay connected (back to host/join).</summary>
+        public async void Leave()
+        {
+            await SendText("{\"t\":\"leave\"}");
+            _room = null;
+            _latest = null;
+        }
+
+        /// <summary>Tear the connection down entirely (leaving the online page).</summary>
+        public void Disconnect()
+        {
+            try { _ = SendText("{\"t\":\"leave\"}"); } catch { }
+            try { _cts?.Cancel(); _ws?.Dispose(); } catch { }
+            _ws = null;
+            _room = null;
+            _latest = null;
+            _localIds.Clear();
+            PlayerId = null;
+            State = LinkState.Idle;
+        }
 
         public void SubmitFor(string playerId, GameInput input)
         {
@@ -105,19 +209,23 @@ namespace Eliminated.Game.Net
                 }
             }
             catch { /* dropped */ }
+            finally { if (State == LinkState.Online) State = LinkState.Failed; }
         }
 
         private void HandleText(string json)
         {
-            if (json.Contains("\"welcome\""))
+            // Discriminate on the leading "t" tag so a player named e.g. "room"
+            // can't be mistaken for a control message.
+            if (json.Contains("\"t\":\"welcome\""))
             {
                 var w = JsonUtility.FromJson<Welcome>(json);
                 PlayerId = w.playerId;
                 _localIds.Clear();
                 _localIds.Add(PlayerId);
+                State = LinkState.Online;
             }
-            else if (json.Contains("\"created\"")) LastCode = JsonUtility.FromJson<Created>(json).code;
             else if (json.Contains("\"t\":\"room\"")) _room = JsonUtility.FromJson<RoomMsg>(json);
+            else if (json.Contains("\"t\":\"error\"")) LastError = JsonUtility.FromJson<ErrorMsg>(json).msg;
         }
 
         private void HandleSnapshot(byte[] payload)
@@ -156,6 +264,47 @@ namespace Eliminated.Game.Net
             // Decode the per-game data so props/discrete HUDs render online too.
             snap.Data = DecodeData(f.Game, f.DataJson);
             _latest = snap;
+        }
+
+        // ── Adapt the server's room-message results into the sim result types the
+        //    HUD already renders. Rebuilt only when the room message changes. ──
+        private void RebuildResults()
+        {
+            var r = _room;
+            if (ReferenceEquals(r, _resultsFor)) return;
+            _resultsFor = r;
+            _reportCache = BuildReport(r?.lastRound);
+            _seriesCache = BuildSeries(r);
+        }
+
+        private static RoundReport BuildReport(NetLastRound lr)
+        {
+            if (lr == null) return null;
+            var report = new RoundReport
+            {
+                Game = Enum.TryParse<GameId>(lr.game ?? "", out var g) ? g : default,
+                RoundNumber = lr.number
+            };
+            if (lr.entries != null)
+                foreach (var e in lr.entries)
+                    report.Entries.Add(new RankEntry(e.PlayerId, e.Placement, e.Survived, e.Note) { MarblesEarned = e.marbles });
+            return report;
+        }
+
+        private static SeriesResult BuildSeries(RoomMsg r)
+        {
+            if (r?.standings == null) return null;
+            var sr = new SeriesResult { ChampionId = r.champion };
+            foreach (var s in r.standings)
+                sr.Standings.Add(new SeriesStanding
+                {
+                    PlayerId = s.PlayerId,
+                    Placement = s.Placement,
+                    Marbles = s.Marbles,
+                    RoundsSurvived = s.RoundsSurvived,
+                    Title = s.Title
+                });
+            return sr;
         }
 
         /// <summary>Deserialize the per-game data json into the type
@@ -206,4 +355,3 @@ namespace Eliminated.Game.Net
         }
     }
 }
-#endif

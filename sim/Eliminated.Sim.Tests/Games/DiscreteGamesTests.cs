@@ -31,6 +31,26 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
+        public void GlassBridge_human_turn_waits_for_input_and_is_not_auto_played()
+        {
+            // Regression: a HUMAN's turn used to be auto-resolved (a random guess "the computer
+            // went for me"). A human must hold the turn open — only ticking past the long
+            // last-resort timeout (or actually inputting) resolves it.
+            var actors = Humans(1);
+            var g = new GlassBridge(Ctx(actors, 1));
+            g.Start();
+            Assert.Equal("choose", g.CurrentPhase);
+            Assert.Equal("h0", g.ActiveId);
+            for (int i = 0; i < 60; i++) g.Tick(Constants.Dt); // ~3s, well under the 9s timeout
+            Assert.Equal("choose", g.CurrentPhase);            // still the human's turn — NOT auto-played
+            Assert.Equal(0, g.Frontier);
+            string safe = g.SafeSide(0) == 1 ? "R" : "L";
+            g.OnInput("h0", GameInput.Choose(safe));           // the human finally picks
+            Assert.Equal("resolve", g.CurrentPhase);
+            Assert.Equal(1, g.Frontier);
+        }
+
+        [Fact]
         public void GlassBridge_wrong_guess_shatters_the_glass()
         {
             var actors = Humans(3);
@@ -65,6 +85,22 @@ namespace Eliminated.Sim.Tests.Games
             g.Start();
             for (int i = 0; i < 120 && actors[0].Alive; i++) g.Tick(Constants.Dt);
             Assert.False(actors[0].Alive);
+        }
+
+        [Fact]
+        public void JumpRope_plays_out_a_full_crossing_not_ending_after_one_fall()
+        {
+            // Regression: an early-round survivor target of ~11/12 used to END the round the instant
+            // ONE player was swept off — nobody crossed, "the game ended itself". Now it runs a real
+            // race: the rope swings many times and jumpers actually reach the far side.
+            var actors = Bots(12);
+            var g = new JumpRope(Ctx(actors, 3, intensity: 0.3f));
+            g.Start();
+            int ticks = 0;
+            while (!g.IsDone && ticks < 60 * 40) { g.Tick(Constants.Dt); ticks++; }
+            Assert.True(g.IsDone);
+            Assert.True(g.Swing >= 5, $"round ended after only {g.Swing} swing(s) — it bailed too early");
+            Assert.Contains(actors, a => g.Crossed(a.Id)); // somebody made it across
         }
 
         [Fact]

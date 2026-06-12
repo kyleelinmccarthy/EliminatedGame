@@ -41,7 +41,7 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
-        public void Green_lets_a_blob_advance_toward_the_finish()
+        public void Green_lets_a_player_advance_toward_the_finish()
         {
             var (g, actors) = Make(1, 0);
             var a = actors[0];

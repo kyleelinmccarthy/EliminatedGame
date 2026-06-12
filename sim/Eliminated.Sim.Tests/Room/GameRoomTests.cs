@@ -54,13 +54,42 @@ namespace Eliminated.Sim.Tests.Room
         }
 
         [Fact]
-        public void Bot_fill_tops_the_field_up_to_six()
+        public void Bot_fill_tops_the_field_up_to_the_target()
         {
             var r = Room();
             r.AddPlayer(Human("p1"));
             Assert.True(r.StartSeries());
             Assert.Equal(Constants.BotFillTarget, r.Players.Count);
+            Assert.True(r.Players.Count <= Constants.MaxPlayers); // never overflows the lobby cap
             Assert.Equal(RoomPhase.Intro, r.Phase);
+        }
+
+        [Theory]
+        [InlineData(4)]
+        [InlineData(6)]
+        [InlineData(8)]
+        [InlineData(12)]
+        public void Field_size_caps_the_bot_filled_count(int fieldSize)
+        {
+            // The solo lobby sets RoomConfig.MaxPlayers to the chosen contestant count;
+            // bot-fill must top the field up to EXACTLY that many (you + bots), never fewer.
+            var r = Room();
+            r.UpdateConfig(new RoomConfig { MaxPlayers = fieldSize, BotFill = true });
+            r.AddPlayer(Human("p1"));
+            Assert.True(r.StartSeries());
+            Assert.Equal(fieldSize, r.Players.Count);
+        }
+
+        [Fact]
+        public void Add_bot_refuses_once_the_room_is_at_max_players()
+        {
+            var r = Room();
+            r.UpdateConfig(new RoomConfig { MaxPlayers = 3, BotFill = false });
+            r.AddPlayer(Human("p1"));
+            Assert.NotNull(r.AddBot());          // 2 competitors
+            Assert.NotNull(r.AddBot());          // 3 — at cap
+            Assert.Null(r.AddBot());             // refused: would overflow the lobby
+            Assert.Equal(3, r.Players.Count);
         }
 
         [Fact]
@@ -101,10 +130,41 @@ namespace Eliminated.Sim.Tests.Room
             Assert.True(RunUntil(r, () => r.Phase == RoomPhase.SeriesResult));
             var sr = r.SeriesResult;
             Assert.NotNull(sr);
-            Assert.Equal(6, sr.Standings.Count);
-            Assert.Equal(Enumerable.Range(1, 6), sr.Standings.Select(s => s.Placement).OrderBy(x => x));
+            Assert.Equal(Constants.BotFillTarget, sr.Standings.Count);
+            Assert.Equal(Enumerable.Range(1, Constants.BotFillTarget), sr.Standings.Select(s => s.Placement).OrderBy(x => x));
             Assert.NotNull(sr.ChampionId);
-            Assert.Equal("The Last Blob Standing", sr.Standings.First(s => s.Placement == 1).Title);
+            Assert.Equal("The Last Player Standing", sr.Standings.First(s => s.Placement == 1).Title);
+        }
+
+        [Fact]
+        public void Final_game_flag_marks_only_the_last_scheduled_round()
+        {
+            // IsFinalGame drives the finale music + "The final game…" announcer, online
+            // (serialized into the server room message) and offline. It must be set on
+            // exactly the last scheduled round and never before.
+            var r = Room(seed: 5);
+            r.UpdateConfig(new RoomConfig { Mode = SeriesMode.Casual, Rounds = RoundsMode.Fixed(3) });
+            r.AddPlayer(Human("p1"));
+            r.StartSeries();
+
+            bool finaleOnLast = false, finaleTooEarly = false, lastRoundUnflagged = false;
+            int maxRound = 0;
+            for (int i = 0; i < 400_000 && r.Phase != RoomPhase.SeriesResult; i++)
+            {
+                r.Tick(Constants.Dt);
+                if (r.Phase != RoomPhase.Intro && r.Phase != RoomPhase.Playing) continue;
+                maxRound = System.Math.Max(maxRound, r.RoundIndex);
+                bool isLast = r.RoundIndex == r.TotalRounds - 1;
+                if (r.IsFinalGame && !isLast) finaleTooEarly = true;
+                if (r.IsFinalGame && isLast) finaleOnLast = true;
+                if (!r.IsFinalGame && isLast) lastRoundUnflagged = true;
+            }
+
+            Assert.Equal(RoomPhase.SeriesResult, r.Phase);
+            Assert.Equal(2, maxRound);          // all three scheduled rounds ran (index 0..2)
+            Assert.True(finaleOnLast);          // the flag fires on the last round…
+            Assert.False(finaleTooEarly);       // …never on an earlier one…
+            Assert.False(lastRoundUnflagged);   // …and is always set while the finale plays
         }
 
         [Fact]

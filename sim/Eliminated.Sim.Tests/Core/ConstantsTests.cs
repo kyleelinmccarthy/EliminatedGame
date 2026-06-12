@@ -26,12 +26,12 @@ namespace Eliminated.Sim.Tests.Core
         }
 
         [Fact]
-        public void Room_limits_match_reference()
+        public void Room_limits_are_pinned()
         {
             Assert.Equal(4, Constants.RoomCodeLen);
-            Assert.Equal(8, Constants.MaxPlayers);
+            Assert.Equal(12, Constants.MaxPlayers); // raised from the reference's 8 for 12-player lobbies
             Assert.Equal(2, Constants.MinToStart);
-            Assert.Equal(6, Constants.BotFillTarget);
+            Assert.Equal(12, Constants.BotFillTarget);
         }
     }
 }

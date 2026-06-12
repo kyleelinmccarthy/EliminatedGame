@@ -73,7 +73,9 @@ namespace Eliminated.Sim.Games
                     BotCadence = a.IsBot ? RollCd + (0.15f + _rng.NextFloat() * 0.65f) : RollCd
                 };
             BuildBoard();
-            _duration = (float)Math.Round(40f - _ctx.Intensity * 10f);
+            // Tighter clock than the web's 40s (a generous clock meant "everyone wins"), but
+            // roomy enough that a player bounced to the start can re-climb. 24..33s.
+            _duration = (float)Math.Round(33f - _ctx.Intensity * 9f);
             _timeLeft = _duration;
         }
 
@@ -148,7 +150,7 @@ namespace Eliminated.Sim.Games
             if (side == chute.DeathSide)
             {
                 bool othersAlive = _climbers.Values.Any(x => x.Id != id && x.Alive);
-                if (!othersAlive) { c.Square = 0; return; } // last-blob lucky catch
+                if (!othersAlive) { c.Square = 0; return; } // last-player lucky catch
                 c.Alive = false; SyncActor(id, false);
                 _elim.Add((id, "Took the wrong fork — into the abyss!"));
                 _fx.Add(new Effect(EffectKind.Death));
@@ -198,9 +200,26 @@ namespace Eliminated.Sim.Games
         private void Finish()
         {
             if (_done) return;
+            // Hardcore finale: crown exactly one — keep the single best-standing climber,
+            // eliminate everyone else worst-first (finishers immune otherwise leave a crowd).
+            if (_ctx.ForceSingleSurvivor)
+            {
+                var alive = _climbers.Values.Where(c => c.Alive).OrderByDescending(Standing).ToList();
+                for (int i = 1; i < alive.Count; i++)
+                {
+                    var c = alive[i];
+                    c.Alive = false; c.Choosing = -1; SyncActor(c.Id, false);
+                    _elim.Add((c.Id, c.Finished ? "Pipped at the summit"
+                        : (c.Square <= 0 ? "Never left the start!" : $"Didn't reach safety — stuck at {c.Square}")));
+                }
+                _done = true;
+                return;
+            }
             var finishers = _climbers.Values.Where(c => c.Alive && c.Finished).ToList();
             var strag = _climbers.Values.Where(c => c.Alive && !c.Finished).OrderBy(Standing).ToList();
-            int spare = (int)Math.Round(strag.Count * (1f - _ctx.Intensity) * 0.5f);
+            // Cull harder than the web (0.5) so it isn't "everyone wins", but not brutally — 0.38
+            // spares enough stragglers that a near-miss isn't always fatal.
+            int spare = (int)Math.Round(strag.Count * (1f - _ctx.Intensity) * 0.38f);
             if (finishers.Count == 0) spare = Math.Max(spare, 1);
             int cut = Math.Max(0, strag.Count - spare);
             for (int i = 0; i < cut; i++)
@@ -244,8 +263,53 @@ namespace Eliminated.Sim.Games
             return res;
         }
 
+        // Drop each climber onto its board square. The board snakes (boustrophedon)
+        // like a real Chutes &amp; Ladders board: square 1 bottom-left, the top row is
+        // the goal. Climbers sharing a square fan out so they don't overlap.
+        private void Layout()
+        {
+            int rows = Math.Max(1, Goal / Cols);
+            var bySquare = new Dictionary<int, List<Actor>>();
+            foreach (var a in _ctx.Actors)
+            {
+                if (!_climbers.TryGetValue(a.Id, out var c)) continue;
+                int sq = MathUtil.Clamp(c.Square, 0, Goal);
+                if (!bySquare.TryGetValue(sq, out var list)) { list = new List<Actor>(); bySquare[sq] = list; }
+                list.Add(a);
+            }
+            foreach (var kv in bySquare)
+            {
+                Vec2 cell = CellCenter(kv.Key, Cols, rows);
+                var list = kv.Value;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    float ang = list.Count > 1 ? (i / (float)list.Count) * 6.2831853f : 0f;
+                    float r = list.Count > 1 ? 28f : 0f;
+                    list[i].Pos = Stage.Clamp(cell.X + (float)Math.Cos(ang) * r, cell.Y + (float)Math.Sin(ang) * r);
+                }
+            }
+        }
+
+        // Square (0 = start, 1..Goal on the board) → logical arena position. A CENTRED
+        // SQUARE board (equal x/y pitch) so ladders read as clean diagonals instead of a
+        // squashed criss-cross. MUST stay identical to the ArenaView ChutesData Cell()
+        // mapping so each climber player lands on its drawn cell.
+        private static Vec2 CellCenter(int square, int cols, int rows)
+        {
+            float pitch = Math.Min(1060f / Math.Max(1, cols), 500f / Math.Max(1, rows));
+            float ox = Constants.ArenaW * 0.5f - pitch * cols * 0.5f;       // left edge
+            float oyBottom = Constants.ArenaH * 0.5f + pitch * rows * 0.5f;  // bottom edge (row 0 here)
+            if (square <= 0) return new Vec2(ox + pitch * 0.5f, oyBottom + pitch * 0.6f); // start pad below the board
+            int s = square - 1;
+            int row = s / cols;                 // 0 = bottom row
+            int inRow = s % cols;
+            int col = (row % 2 == 0) ? inRow : (cols - 1 - inRow); // snake the rows
+            return new Vec2(ox + (col + 0.5f) * pitch, oyBottom - (row + 0.5f) * pitch);
+        }
+
         public Snapshot BuildSnapshot()
         {
+            Layout();
             var fx = _fx.Count > 0 ? new List<Effect>(_fx) : null;
             _fx.Clear();
             return new Snapshot

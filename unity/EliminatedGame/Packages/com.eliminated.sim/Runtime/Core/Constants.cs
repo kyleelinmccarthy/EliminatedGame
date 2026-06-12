@@ -33,9 +33,13 @@ namespace Eliminated.Sim.Core
 
         // ── Rooms ────────────────────────────────────────────────────────
         public const int RoomCodeLen = 4;
-        public const int MaxPlayers = 8;
+        /// <summary>Hard cap on competitors (humans + bots) per room. Raised from
+        /// the reference game's 8 to support 12-player lobbies.</summary>
+        public const int MaxPlayers = 12;
         public const int MinToStart = 2;
-        public const int BotFillTarget = 6;
+        /// <summary>How many competitors bot-fill tops a room up to. Solo runs and
+        /// short-handed casual rooms fill to a full field (== MaxPlayers).</summary>
+        public const int BotFillTarget = 12;
 
         // ── Phase timings (milliseconds) ─────────────────────────────────
         public const int IntroMs = 5400;

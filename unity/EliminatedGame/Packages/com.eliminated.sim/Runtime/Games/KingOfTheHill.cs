@@ -8,10 +8,13 @@ using Eliminated.Sim.Powerups;
 namespace Eliminated.Sim.Games
 {
     /// <summary>
-    /// King of the Lava Islands — the series finale. The floor is lava; islands
+    /// King of the Lava Islands — a regular game that's also finale-capable
+    /// (eligible as one of the randomly-chosen series finales; see GameRoom
+    /// finale selection). The floor is lava; islands
     /// rise, hold, and sink. Hop between them, grab powerups, and SHOVE rivals
-    /// into the magma. Collapses to one shrinking last-stand island. Last blob
-    /// not-on-fire is champion. Ported from lib/server/games/KingOfTheHill.ts.
+    /// into the magma. A finale collapses to one shrinking last-stand island and
+    /// crowns a single champion; a regular round culls toward an intensity-based
+    /// survivor target. Ported from lib/server/games/KingOfTheHill.ts.
     /// </summary>
     public sealed class KingOfTheHill : ArenaGame
     {
@@ -29,6 +32,7 @@ namespace Eliminated.Sim.Games
         private const float RLarge = 150f;
         private const float FinalR = 32f;
         private const float SinkRate = 45f;
+        private const float HopReach = 175f; // how far a player can realistically hop/dash to the next island
 
         private enum Phase { Rising, Stable, Sinking }
 
@@ -50,6 +54,7 @@ namespace Eliminated.Sim.Games
         private string _kingId;
         private readonly PowerupField _powerups;
         private bool _done;
+        private int _targetSurvivors;
 
         public KingOfTheHill(GameContext ctx) : base(ctx)
         {
@@ -66,6 +71,12 @@ namespace Eliminated.Sim.Games
         public override void Start()
         {
             Elapsed = 0f;
+            // A finale crowns one champion; a regular round culls toward a
+            // target derived from intensity (like the other games), so it
+            // doesn't gut the field.
+            _targetSurvivors = Ctx.IsFinale
+                ? 1
+                : Math.Max(2, (int)Math.Ceiling(Actors.Count * (1f - 0.55f * Ctx.Intensity)));
             const int nStart = 5;
             for (int i = 0; i < nStart; i++)
             {
@@ -158,13 +169,15 @@ namespace Eliminated.Sim.Games
             Lava(dt);
             Crown(dt);
 
-            if (Alive.Count <= 1 || Elapsed >= TimeCap) _done = true;
+            if (Alive.Count <= _targetSurvivors || Elapsed >= TimeCap) _done = true;
         }
 
         private void UpdateIslands(float dt)
         {
             float t = Elapsed;
-            if (!_suddenDeath && t >= OpeningGrace && (t >= TimeCap * 0.72f || Alive.Count <= 2))
+            // The collapse-to-one-island last stand is a finale finish only;
+            // regular rounds rely on the natural island churn to reach target.
+            if (!_suddenDeath && _targetSurvivors <= 1 && t >= OpeningGrace && (t >= TimeCap * 0.72f || Alive.Count <= 2))
                 EnterSuddenDeath();
 
             if (_suddenDeath)
@@ -209,6 +222,33 @@ namespace Eliminated.Sim.Games
                 if (isl.Phase == Phase.Sinking) isl.R = Math.Max(0f, isl.R - SinkRate * dt);
                 else isl.R += (isl.TargetR - isl.R) * Math.Min(1f, dt * 3f);
             }
+
+            // Anti-strand guarantee: nobody should die because the ground sank out from under
+            // them with nowhere to jump. If a player is STANDING ON an island (not adrift in
+            // open lava — that's their own mistake) and it's sinking with NO other island in hop
+            // range, re-float it until an escape exists. Disabled in sudden death (the finale
+            // collapse is supposed to strand the stragglers). This never saves a player who
+            // walked/was shoved into open lava when a reachable island exists.
+            if (!_suddenDeath)
+            {
+                foreach (var a in Alive)
+                {
+                    Island under = null; float bestEdge = float.MaxValue;
+                    foreach (var isl in _islands)
+                    {
+                        float edge = Vec2.Distance(a.Pos, new Vec2(isl.X, isl.Y)) - isl.R;
+                        if (edge < bestEdge) { bestEdge = edge; under = isl; }
+                    }
+                    if (under == null || bestEdge > 8f) continue; // not on/at an island → unprotected
+                    bool escape = _islands.Any(isl => isl != under && isl.Phase != Phase.Sinking
+                        && Vec2.Distance(a.Pos, new Vec2(isl.X, isl.Y)) <= isl.R + HopReach);
+                    if (escape) continue; // they can hop away → let it sink (a fair skill cull)
+                    under.Phase = Phase.Stable;
+                    under.TargetR = Math.Max(under.TargetR, Math.Min(under.MaxR, RSmall + 40f));
+                    under.Timer = Math.Max(under.Timer, 2.0f);
+                }
+            }
+
             _islands = _islands.Where(i => i.Final || !(i.Phase == Phase.Sinking && i.R < 3f)).ToList();
         }
 
@@ -317,19 +357,25 @@ namespace Eliminated.Sim.Games
                 }
         }
 
+        private const float SpawnGrace = 2.5f; // no lava deaths while players get their bearings
+
         private void Lava(float dt)
         {
+            // Opening grace: everyone spawns ON an island, but give a beat to orient before
+            // the magma bites so a first-second stumble (or a sinking starter island) is survivable.
+            bool graced = Elapsed < SpawnGrace;
             foreach (var a in Alive)
             {
                 bool inLava = IslandUnder(a.Pos) == null;
-                a.Burning = inLava;
+                a.Burning = inLava && !graced;
+                if (graced) { a.Set("burnT", 0f); continue; }
                 if (inLava)
                 {
                     a.Set("burnT", a.Get("burnT") + dt);
                     if (a.Get("burnT") >= BurnGrace)
                     {
                         if (a.Shield) { a.Shield = false; a.Set("burnT", 0f); Emit(new Effect(EffectKind.Ring, a.Pos.X, a.Pos.Y)); }
-                        else if (Alive.Count <= 1) a.Set("burnT", BurnGrace * 0.5f);
+                        else if (Alive.Count <= _targetSurvivors) a.Set("burnT", BurnGrace * 0.5f);
                         else { a.Burning = false; Eliminate(a, "Lava'd!"); }
                     }
                 }
@@ -419,6 +465,7 @@ namespace Eliminated.Sim.Games
             KingId = _kingId,
             Alive = Alive.Count,
             Night = Ctx.Night,
+            SuddenDeath = _suddenDeath,
             Pickups = _powerups.Snapshot()
         };
 
@@ -429,6 +476,7 @@ namespace Eliminated.Sim.Games
             public string KingId;
             public int Alive;
             public bool Night;
+            public bool SuddenDeath; // last-island collapse — HUD raises the stakes banner
             public List<PickupView> Pickups;
         }
         public struct IslandView { public float X, Y, R; public bool Final; }

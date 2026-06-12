@@ -5,9 +5,11 @@ using System.IO;
 namespace Eliminated.Tools.ArtGen
 {
     /// <summary>
-    /// Generates the 6 themed arena floor textures as uncompressed 32-bit TGA
-    /// images (our own procedural output — no third-party license). Themes/palettes
-    /// match docs/GAME_DESIGN.md. Unity imports TGA natively.
+    /// LEGACY floor generator: flat 256x256 checkerboard tiles. The shipping arena
+    /// floors are now the richer, seamless, dark/neon 512x512 textures produced by
+    /// <c>tools/ArtGen/gen_floors.py</c> — do NOT run this for floors or it will
+    /// overwrite them. Kept for reference / sibling generators (ModelGen, SfxGen).
+    /// Our own procedural output — no third-party license. Unity imports TGA natively.
     /// </summary>
     public static class Program
     {

@@ -25,7 +25,7 @@ EMPTY_GRACE_MS = 30000  HEARTBEAT = 30000
 ```
 survivePerRound = 50    roundWinBonus = 40    elimParticipation = 5
 championBonus = 300      placementCurve = [200, 120, 80, 50, 30]   (1st..5th series)
-Titles (by placement): "The Last Blob Standing", "First Loser",
+Titles (by placement): "The Last Player Standing", "First Loser",
   "Bronze Is Just Shiny Last", "Mid-Tier Menace", "Cannon Fodder"
 ```
 
@@ -70,7 +70,7 @@ Boomerang-only extras: ✨ multishot (3 rangs, 10 s), 🪃 big-rang (2.1× hit r
 
 ### Death rules
 - **Hardcore** — elimination is permanent for the whole series; dead players
-  spectate (and may bet in the Dead Pool). Series ends when one blob remains;
+  spectate (and may bet in the Dead Pool). Series ends when one player remains;
   the finale forces a single survivor.
 - **Casual** — players respawn each round; win on points across all rounds.
 
@@ -128,8 +128,8 @@ champion, with total marbles, rounds survived (tiebreak), and a title.
 - Bot AI: mill near center during wander; pick the room that best reaches exactly N.
 
 ### 3.4 🪟 Glass Stepping Stones — `GlassBridge`
-- One safe side per row (0/1), hidden. Cross in line order; active blob guesses the
-  frontier row. Correct → advance & reveal; wrong → eliminated (last blob gets a
+- One safe side per row (0/1), hidden. Cross in line order; active player guesses the
+  frontier row. Correct → advance & reveal; wrong → eliminated (last player gets a
   lucky catch). 4–12 rows by intensity × headcount. Turn 6 s (auto-guess on
   timeout), resolve anim 1.1 s.
 - Win: cross all rows. Controls: ← / → (LEFT/RIGHT). Bot AI: 50/50 on unknown rows,
@@ -177,7 +177,7 @@ champion, with total marbles, rounds survived (tiebreak), and a title.
 ### 3.10 🪑 Musical Chairs — `MusicalChairs`
 - Chairs appear only when music stops. Phases: Music 3.5–6.0 s (keep moving —
   still > 1.4 s out; `STILL_SPEED = 40`; DJ throws 0.45 s fake-out "STOP!"s, cd
-  1.1 s) → Scramble 4 s (chairs scatter, one seat each) → Eval (standing blobs out,
+  1.1 s) → Scramble 4 s (chairs scatter, one seat each) → Eval (standing players out,
   survivors reset to center). Chairs = aliveCount − 1 each round; 1–3 rounds; stop
   at ≤2 alive. Dash cd 1.8 s.
 - Bot AI: orbit center during music; pick nearest free chair on scramble (reaction
@@ -189,7 +189,7 @@ champion, with total marbles, rounds survived (tiebreak), and a title.
   phase 11 s: each receiver guesses their giver — correct → giver out, wrong →
   receiver out. Reveal 4.2 s. 1–2 rounds. Gifts travel via per-player `secret`
   (never broadcast). Collision: same receiver → first wins, second reassigned.
-- Controls: dark — tap blob to gift; lit — tap suspect to guess.
+- Controls: dark — tap player to gift; lit — tap suspect to guess.
 - Bot AI: random receiver; random suspect.
 
 ### 3.12 🌋 King of the Lava Islands — `KingOfTheHill` (FINALE)
@@ -197,7 +197,7 @@ champion, with total marbles, rounds survived (tiebreak), and a title.
   (`SINK_RATE = 45` units/s); small radius 56–150, final 32. Sudden death when ≤2
   alive or after `OPENING_GRACE = 14 s` → collapse to one shrinking island. Shove
   (click/space): cone 66 units, ±71° arc, knockback `SHOVE_IMPULSE = 380`, cd
-  0.6 s. Powerups on islands (55 % good). Win: last blob not burning.
+  0.6 s. Powerups on islands (55 % good). Win: last player not burning.
 - Controls: move + aim + shove + dash.
 
 ### Extras (in code, secondary rotation)
@@ -210,8 +210,8 @@ champion, with total marbles, rounds survived (tiebreak), and a title.
 
 ## 4. Characters, arenas, audio (client-side, real assets in Unity)
 
-- **16 blob characters** (food + critters: avocado, fox, wizard, sushi, koala…),
-  originally drawn procedurally; in Unity these become 3D blob models with
+- **16 player characters** (food + critters: avocado, fox, wizard, sushi, koala…),
+  originally drawn procedurally; in Unity these become 3D player models with
   squash/stretch anims (idle/run/cheer/dead/fall), a number bib, and effect
   overlays (shield bubble, ghost, flash, "it" aura, "you" marker). Unlock fancier
   ones with Marbles. Accessory slots: head/eyes/neck/ear (≤1 each).

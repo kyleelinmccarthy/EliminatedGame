@@ -217,6 +217,7 @@ namespace Eliminated.Sim.Games
             a.Set("dashT", DashDur);
             a.Set("dashCd", DashCd);
             a.Set("invuln", Math.Max(a.Get("invuln"), 0.3f));
+            Emit(new Effect(EffectKind.Spark, a.Pos.X, a.Pos.Y)); // dodge poof so the dash reads
         }
 
         private void DropBall(Ball b)

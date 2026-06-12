@@ -34,10 +34,21 @@ namespace Eliminated.Sim.Economy
         // ── Titles (by 1-based placement) ────────────────────────────────
         public static readonly string[] Titles =
         {
-            "The Last Blob Standing",
+            "The Last Player Standing",
             "First Loser",
             "Bronze Is Just Shiny Last",
             "Mid-Tier Menace",
+            "Almost Clutch",
+            "Solidly Average",
+            "Participation Trophy",
+            "Background Player",
+            "Comic Relief",
+            "Warm Body",
+            "Speed Bump",
+            "Crowd Filler",
+            "Barely Showed Up",
+            "Tutorial Difficulty",
+            "Practice Dummy",
             "Cannon Fodder"
         };
 

@@ -235,8 +235,24 @@ namespace Eliminated.Sim.Games
             return RankingUtil.Crown(Id, survivors, _elim, _ctx.ForceSingleSurvivor, "Still standing at the buzzer");
         }
 
+        // Line the contestants up as a crowd facing the Game Master (toward the
+        // top of the stage). A stable grid keyed on join order keeps each player in
+        // place beat to beat; the ones who flunk a beat are dropped by Alive.
+        private void Layout()
+        {
+            int n = _ctx.Actors.Count;
+            int cols = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(n * 1.7)));
+            for (int i = 0; i < _ctx.Actors.Count; i++)
+            {
+                var a = _ctx.Actors[i];
+                a.Pos = Stage.Grid(i, n, cols, Stage.MinX, Stage.CenterY - 40f, Stage.MaxX, Stage.MaxY);
+                a.Facing = -(float)Math.PI / 2f; // look up toward the caller
+            }
+        }
+
         public Snapshot BuildSnapshot()
         {
+            Layout();
             var fx = _fx.Count > 0 ? new List<Effect>(_fx) : null;
             _fx.Clear();
             bool show = _phase != "ready";

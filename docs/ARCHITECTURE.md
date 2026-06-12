@@ -57,7 +57,7 @@ must never reference `UnityEngine`.
 | `App` | Boot, scene/flow director, game-mode setup (solo/coop/online) |
 | `SimBridge` | Owns a `SimHost` (in-process sim) or consumes networked snapshots; maps Unity input → `GameInput`; exposes latest snapshot to the view |
 | `Net` | Unity Relay + Lobby + Auth; `NetSession` transport (input RPC up, snapshot down); host/client lifecycle |
-| `View` | Top-down ortho camera; pooled `BlobView`s bound to actor ids with interpolation; arena prefabs; per-game view modules; FX/screen-shake |
+| `View` | Top-down ortho camera; pooled `PlayerView`s bound to actor ids with interpolation; arena prefabs; per-game view modules; FX/screen-shake |
 | `Input` | Input System actions, control schemes, device pairing (local co-op), touch controls, rebinding |
 | `UI` | UI Toolkit screens: menu, shop, host/join, lobby, HUD, overlays, settings |
 | `Audio` | AudioMixer buses, SFX/music/voice, subtitles |

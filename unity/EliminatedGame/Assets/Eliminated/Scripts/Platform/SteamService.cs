@@ -21,6 +21,20 @@ namespace Eliminated.Game.Platform
         public static SteamService Instance { get; private set; }
         public static bool Available { get; private set; }
 
+        /// <summary>The signed-in Steam persona name, or null when Steam isn't running.</summary>
+        public string PlayerName =>
+#if ELIMINATED_STEAM
+            Available ? SteamClient.Name :
+#endif
+            null;
+
+        /// <summary>The signed-in Steam id as a string, or null when Steam isn't running.</summary>
+        public string SteamIdString =>
+#if ELIMINATED_STEAM
+            Available ? SteamClient.SteamId.ToString() :
+#endif
+            null;
+
         public void Init(uint appId)
         {
             Instance = this;

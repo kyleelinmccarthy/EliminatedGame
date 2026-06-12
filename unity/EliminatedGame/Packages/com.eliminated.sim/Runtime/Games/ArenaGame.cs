@@ -159,6 +159,11 @@ namespace Eliminated.Sim.Games
             return 1f;
         }
 
+        /// <summary>Per-actor walk-speed multiplier a game can vary by ROLE (default none).
+        /// Tag uses it to give the few "it" freezers a small edge so they can actually catch
+        /// fleeing runners — with exactly equal speed a chaser never closes a straight gap.</summary>
+        protected virtual float RoleSpeedMul(Actor a) => 1f;
+
         // ── Dash ─────────────────────────────────────────────────────────
         protected bool TryDash(Actor a)
         {
@@ -195,7 +200,7 @@ namespace Eliminated.Sim.Games
             {
                 var (dx, dy) = ResolveInput(a);
                 var dir = new Vec2(dx, dy).ClampMagnitude(1f);
-                float speed = MoveSpeed * StatusSpeedMul(a) * SizeSpeedMul(a);
+                float speed = MoveSpeed * StatusSpeedMul(a) * SizeSpeedMul(a) * RoleSpeedMul(a);
                 vel = dir * speed;
                 if (dir.SqrLength > 0.0025f)
                 {

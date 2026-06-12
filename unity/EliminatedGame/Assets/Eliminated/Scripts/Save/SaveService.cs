@@ -60,7 +60,14 @@ namespace Eliminated.Game.Save
         public static void ApplySettings(GameSettings s)
         {
             if (s == null) return;
+            // Migrate legacy saves: the colorblind enum used to be 4-valued
+            // (Normal/Protanopia/Deuteranopia/Tritanopia). It's now 3-valued
+            // (Normal/RedGreen/BlueYellow). Old Tritanopia (=3) is no longer a
+            // defined value — map any such stale int to the blue–yellow palette.
+            if (!System.Enum.IsDefined(typeof(ColorblindMode), s.colorblind))
+                s.colorblind = ColorblindMode.BlueYellow;
             Palette.Mode = s.colorblind;
+            ScreenFx.ReduceMotion = s.reduceFlashAndShake;
             AudioListener.volume = Mathf.Clamp01(s.masterVolume);
             Loc.SetLocale(string.IsNullOrEmpty(s.locale) ? Loc.Default : s.locale);
         }

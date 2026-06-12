@@ -24,7 +24,7 @@ namespace Eliminated.Sim.Model
     /// <summary>Series death rule.</summary>
     public enum SeriesMode
     {
-        /// <summary>Permadeath for the whole series; last blob standing wins.</summary>
+        /// <summary>Permadeath for the whole series; last player standing wins.</summary>
         Hardcore,
         /// <summary>Respawn each round; win on points.</summary>
         Casual

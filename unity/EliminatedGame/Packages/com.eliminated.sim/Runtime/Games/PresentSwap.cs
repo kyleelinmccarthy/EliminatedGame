@@ -8,7 +8,7 @@ namespace Eliminated.Sim.Games
 {
     /// <summary>
     /// Secret Santa Sabotage — lights out, hidden "givers" each slip a gift to a
-    /// blob of their choosing; lights on, every receiver must guess who gave it.
+    /// player of their choosing; lights on, every receiver must guess who gave it.
     /// Right → the giver is caught (out); wrong → the receiver takes the fall.
     /// Givers/receivers are disjoint so the cull is exactly bounded. Ported from
     /// lib/server/games/PresentSwap.ts.
@@ -250,8 +250,19 @@ namespace Eliminated.Sim.Games
             return RankingUtil.Build(Id, survivors, _elim);
         }
 
+        // Seat every player at its assigned spot in the party ring (computed in
+        // Start). Without this the top-down view would pile them all at the
+        // origin; the ring is also where the gift/guess FX are anchored.
+        private void Layout()
+        {
+            foreach (var a in _ctx.Actors)
+                if (_seats.TryGetValue(a.Id, out var s))
+                    a.Pos = Stage.Clamp(s.X, s.Y);
+        }
+
         public Snapshot BuildSnapshot()
         {
+            Layout();
             var fx = _fx.Count > 0 ? new List<Effect>(_fx) : null;
             _fx.Clear();
 
@@ -284,8 +295,12 @@ namespace Eliminated.Sim.Games
                     Events = _phase == "reveal"
                         ? _events.Select(e => new EventView { ReceiverId = e.ReceiverId, GiverId = e.GiverId, GuessId = e.GuessId, Result = e.ResultKind, Correct = e.Correct }).ToList()
                         : (_phase == "guess"
-                            ? _events.Select(e => new EventView { ReceiverId = e.ReceiverId, CandidateIds = e.CandidateIds, Guessed = e.GuessId != null }).ToList()
-                            : new List<EventView>())
+                            // receivers get their suspect slate; givers get who they gave to (GiverId+ReceiverId)
+                            ? _events.Select(e => new EventView { ReceiverId = e.ReceiverId, GiverId = e.GiverId, CandidateIds = e.CandidateIds, Guessed = e.GuessId != null }).ToList()
+                            // GIFT phase: hand each giver their target slate so a HUMAN can pick a victim
+                            : (_phase == "gift"
+                                ? _events.Select(e => new EventView { GiverId = e.GiverId, TargetSlate = e.TargetSlate, Gifted = e.TargetId != null }).ToList()
+                                : new List<EventView>()))
                 }
             };
         }
@@ -303,7 +318,8 @@ namespace Eliminated.Sim.Games
         {
             public string ReceiverId, GiverId, GuessId, Result;
             public List<string> CandidateIds;
-            public bool Guessed, Correct;
+            public List<string> TargetSlate; // gift phase: the giver's pickable victims
+            public bool Guessed, Correct, Gifted;
         }
     }
 }

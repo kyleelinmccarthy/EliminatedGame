@@ -14,9 +14,11 @@ namespace Eliminated.Sim.Games
     /// </summary>
     public sealed class RpsMinusOne : IMinigame
     {
-        private const float PickT = 4.5f;
-        private const float DropT = 3f;
-        private const float ResolveT = 2.0f;
+        // Deliberately roomy: players read two throws, decide, then commit. The earlier
+        // 4.5/3/2 felt frantic (you barely saw the buttons before the phase flipped).
+        private const float PickT = 6.5f;
+        private const float DropT = 4.5f;
+        private const float ResolveT = 2.6f;
         private static readonly string[] Throws = { "R", "P", "S" };
 
         private static int Cmp(string a, string b)
@@ -284,27 +286,55 @@ namespace Eliminated.Sim.Games
             return RankingUtil.Build(Id, winners, _elim);
         }
 
-        public Snapshot BuildSnapshot() => new Snapshot
+        // Stand each duel's two fighters face to face, one duel per row; byes
+        // wait along the right wall. Otherwise the bracket would render as a
+        // heap of players in the corner.
+        private void Layout()
         {
-            Game = Id,
-            Actors = _ctx.Actors,
-            Data = new RpsData
+            var pos = new Dictionary<string, Vec2>();
+            for (int i = 0; i < _duels.Count; i++)
             {
-                Phase = _phase,
-                TimeLeft = Math.Max(0f, _timer),
-                Round = _round,
-                Byes = new List<string>(_byes),
-                Duels = _duels.Select(d => new DuelView
-                {
-                    A = d.A, B = d.B,
-                    AThrows = _phase == "pick" ? new List<string>() : new List<string>(d.AThrows),
-                    BThrows = _phase == "pick" ? new List<string>() : new List<string>(d.BThrows),
-                    AKeep = _phase == "resolve" ? d.AKeep : null,
-                    BKeep = _phase == "resolve" ? d.BKeep : null,
-                    Status = d.Status, Winner = d.Winner, Ties = d.Ties
-                }).ToList()
+                var d = _duels[i];
+                float y = Stage.Spread(i, _duels.Count, Stage.MinY + 30f, Stage.MaxY - 30f);
+                if (d.A != null) pos[d.A] = Stage.Clamp(Stage.CenterX - 150f, y);
+                if (d.B != null) pos[d.B] = Stage.Clamp(Stage.CenterX + 150f, y);
             }
-        };
+            for (int i = 0; i < _byes.Count; i++)
+                pos[_byes[i]] = Stage.Clamp(Stage.MaxX, Stage.Spread(i, _byes.Count, Stage.MinY, Stage.MaxY));
+
+            foreach (var a in _ctx.Actors)
+                if (pos.TryGetValue(a.Id, out var p))
+                {
+                    a.Pos = p;
+                    a.Facing = p.X < Stage.CenterX ? 0f : (float)Math.PI; // face the opponent
+                }
+        }
+
+        public Snapshot BuildSnapshot()
+        {
+            Layout();
+            return new Snapshot
+            {
+                Game = Id,
+                Actors = _ctx.Actors,
+                Data = new RpsData
+                {
+                    Phase = _phase,
+                    TimeLeft = Math.Max(0f, _timer),
+                    Round = _round,
+                    Byes = new List<string>(_byes),
+                    Duels = _duels.Select(d => new DuelView
+                    {
+                        A = d.A, B = d.B,
+                        AThrows = _phase == "pick" ? new List<string>() : new List<string>(d.AThrows),
+                        BThrows = _phase == "pick" ? new List<string>() : new List<string>(d.BThrows),
+                        AKeep = _phase == "resolve" ? d.AKeep : null,
+                        BKeep = _phase == "resolve" ? d.BKeep : null,
+                        Status = d.Status, Winner = d.Winner, Ties = d.Ties
+                    }).ToList()
+                }
+            };
+        }
 
         public sealed class RpsData
         {

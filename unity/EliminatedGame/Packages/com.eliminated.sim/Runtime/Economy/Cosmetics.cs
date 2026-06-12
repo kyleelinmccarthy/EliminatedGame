@@ -20,7 +20,7 @@ namespace Eliminated.Sim.Economy
     }
 
     /// <summary>
-    /// The cosmetic catalog: 38 blob characters (28 free + 10 unlockable) and the
+    /// The cosmetic catalog: 44 player characters (34 free + 10 unlockable) and the
     /// accessory wardrobe (head/eyes/neck/ear). Costs ported verbatim from the
     /// reference characters.ts / accessories.ts. Pure data + lookups so the client
     /// shop and the unlock economy share one source of truth.
@@ -29,17 +29,17 @@ namespace Eliminated.Sim.Economy
     {
         public static readonly CharacterDef[] Characters =
         {
-            // ── Free roster (28) ──
+            // ── Base roster — food / critters / wanderers (most free; a few are in the 1200 premium tier below) ──
             new CharacterDef("koala", "Koalamity", 0),
             new CharacterDef("aardvark", "Aard to Kill", 0),
-            new CharacterDef("panther", "Purrgatory", 0),
+            new CharacterDef("panther", "Purrgatory", 1200),  // premium tier
             new CharacterDef("fox", "Foxic", 0),
             new CharacterDef("capybara", "Capybarely", 0),
             new CharacterDef("wizard", "Hocus Croakus", 0),
-            new CharacterDef("rogue", "Hood Riddance", 0),
+            new CharacterDef("rogue", "Sayonara", 1200),      // premium tier
             new CharacterDef("bunny", "Hare Trigger", 0),
             new CharacterDef("pig", "Boar-ed to Death", 0),
-            new CharacterDef("cat", "Meowderer", 0),
+            new CharacterDef("cat", "Claw and Order", 0),
             new CharacterDef("mouse", "Plague Rat", 0),
             new CharacterDef("hamster", "Hamstrung", 0),
             new CharacterDef("ghost", "Ghosted", 0),
@@ -66,9 +66,17 @@ namespace Eliminated.Sim.Economy
             new CharacterDef("goldegg", "Yolk's On You", 800),
             new CharacterDef("onigiri", "Rigor Rice", 1000),
             new CharacterDef("ninja", "Backstabber", 1200),
-            new CharacterDef("sorcerer", "Hexecutioner", 1600),
+            new CharacterDef("sorcerer", "Hexecutioner", 1200),
             new CharacterDef("ghostpepper", "Reaper Pepper", 2000),
             new CharacterDef("cosmic", "Black Hole", 3000),
+            // ── Critters assembled from the animal pack ──
+            new CharacterDef("cow", "Mooderer", 0),
+            new CharacterDef("owl", "Owl Be Watching", 0),
+            new CharacterDef("snowowl", "Snow Way Out", 1200),  // premium tier
+            new CharacterDef("demon", "Devil's Cut", 1200),     // red devil — premium tier
+            new CharacterDef("devil", "Imp Sympathy", 1200),    // brown devil — premium tier
+            new CharacterDef("sheep", "Lamb to Slaughter", 0),
+            new CharacterDef("clown", "Last Laugh", 0),     // Jovial clown pack — free wanderer
         };
 
         public static readonly AccessoryDef[] Accessories =
@@ -79,6 +87,7 @@ namespace Eliminated.Sim.Economy
             new AccessoryDef("glasses", "eyes", 140), new AccessoryDef("specs", "eyes", 160),
             new AccessoryDef("cateye", "eyes", 190), new AccessoryDef("rounds", "eyes", 240),
             new AccessoryDef("shades", "eyes", 260), new AccessoryDef("aviators", "eyes", 300),
+            new AccessoryDef("eyepatch", "eyes", 250),
             new AccessoryDef("bandana", "neck", 110), new AccessoryDef("bowtie", "neck", 220),
             new AccessoryDef("banana", "ear", 80), new AccessoryDef("flower", "ear", 90),
             new AccessoryDef("greenana", "ear", 100), new AccessoryDef("rose", "ear", 130),

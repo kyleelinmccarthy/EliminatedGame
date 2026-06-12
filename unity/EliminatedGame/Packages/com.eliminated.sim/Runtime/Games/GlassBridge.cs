@@ -7,14 +7,14 @@ namespace Eliminated.Sim.Games
 {
     /// <summary>
     /// Glass Stepping Stones — one shared bridge, one hidden safe side per row.
-    /// Blobs cross one at a time in line order, guessing LEFT/RIGHT for the next
+    /// Players cross one at a time in line order, guessing LEFT/RIGHT for the next
     /// row. Correct advances the frontier and reveals the row; wrong shatters
     /// (unless you're the last, who gets a lucky catch). Ported from
     /// lib/server/games/GlassBridge.ts. Finale-capable via single survivor.
     /// </summary>
     public sealed class GlassBridge : IMinigame
     {
-        private const float TurnTime = 6f;
+        private const float TurnTime = 7f; // a human's window to pick TOP/BOTTOM (web is 6; +1 for the button reach)
         private const float ResolveTime = 1.1f;
         private const float StepTime = 0.5f;
         private const float TimeLimit = 110f;
@@ -34,6 +34,7 @@ namespace Eliminated.Sim.Games
         private readonly List<string> _order = new List<string>();
         private readonly List<int> _pattern = new List<int>();
         private readonly List<bool> _revealed = new List<bool>();
+        private readonly List<int> _brokeSide = new List<int>(); // per row: the side a player shattered on (-1 = none)
         private readonly List<(string id, string note)> _elim = new List<(string, string)>();
         private readonly List<Effect> _fx = new List<Effect>();
 
@@ -66,6 +67,7 @@ namespace Eliminated.Sim.Games
             {
                 _pattern.Add(_rng.NextFloat() < 0.5f ? 0 : 1);
                 _revealed.Add(false);
+                _brokeSide.Add(-1);
             }
             foreach (var id in _rng.Shuffle(_ctx.Actors.Select(a => a.Id).ToList())) _order.Add(id);
             foreach (var a in _ctx.Actors)
@@ -128,17 +130,21 @@ namespace Eliminated.Sim.Games
                 _frontier++;
                 _fx.Add(new Effect(EffectKind.Spark, 0f, row));
             }
-            else if (AliveCount() <= 1)
-            {
-                _frontier++; // lucky catch for the last blob
-                _fx.Add(new Effect(EffectKind.Spark, 0f, row));
-            }
             else
             {
-                w.Alive = false;
-                SyncActor(w.Id, false);
-                _elim.Add((w.Id, $"Shattered the glass at row {row + 1}"));
-                _fx.Add(new Effect(EffectKind.Shatter, 0f, row));
+                _brokeSide[row] = side; // the chosen side was the hole — now public
+                if (AliveCount() <= 1)
+                {
+                    _frontier++; // lucky catch for the last player
+                    _fx.Add(new Effect(EffectKind.Spark, 0f, row));
+                }
+                else
+                {
+                    w.Alive = false;
+                    SyncActor(w.Id, false);
+                    _elim.Add((w.Id, $"Shattered the glass at row {row + 1}"));
+                    _fx.Add(new Effect(EffectKind.Shatter, 0f, row));
+                }
             }
             _phase = "resolve";
             _timer = ResolveTime;
@@ -155,10 +161,16 @@ namespace Eliminated.Sim.Games
                 var w = _walkers[_activeId];
                 if (w.IsBot)
                 {
+                    // Bots decide on their own timer; they never wait out the full turn clock.
                     w.BotThink -= dt;
                     if (w.BotThink <= 0f) { ResolveGuess(_rng.NextFloat() < 0.5f ? 0 : 1); return; }
                 }
-                if (_timer <= 0f) ResolveGuess(_rng.NextFloat() < 0.5f ? 0 : 1);
+                else if (_timer <= 0f)
+                {
+                    // HUMAN: the turn clock is only a LAST-RESORT timeout. The human picks via the
+                    // HUD's LEFT/RIGHT buttons (OnInput); we only auto-resolve if they never act.
+                    ResolveGuess(_rng.NextFloat() < 0.5f ? 0 : 1);
+                }
                 return;
             }
             if (_phase == "step")
@@ -205,8 +217,59 @@ namespace Eliminated.Sim.Games
             return RankingUtil.Build(Id, survivors, _elim);
         }
 
+        // Stage the crossing left → right: a queue waits on the near platform,
+        // the active walker is out on the bridge at the current row, and walkers
+        // who made it cluster on the far safe platform.
+        private void Layout()
+        {
+            // bridgeX0/X1 MUST match the glass-pane span the view draws
+            // (ArenaView GlassData case: Lerp(300,1030,(r+0.5)/rows)) so the active
+            // walker stands ON its pane rather than drifting off it.
+            const float queueX = Stage.Margin;          // near (start) platform
+            const float bridgeX0 = 300f;
+            const float bridgeX1 = 1030f;
+            float farX = Stage.MaxX;                     // far (safe) platform
+
+            var waiting = _order
+                .Where(id => { var w = _walkers[id]; return w.Alive && !w.Finished && id != _activeId; })
+                .ToList();
+            var finished = _order.Where(id => _walkers[id].Finished).ToList();
+
+            for (int i = 0; i < waiting.Count; i++)
+            {
+                var a = _ctx.Actors.FirstOrDefault(x => x.Id == waiting[i]);
+                if (a == null) continue;
+                int lane = i % 3, rank = i / 3;
+                a.Pos = Stage.Clamp(queueX + rank * 64f, Stage.Spread(lane, 3, Stage.CenterY - 150f, Stage.CenterY + 150f));
+                a.Facing = 0f;
+            }
+
+            for (int i = 0; i < finished.Count; i++)
+            {
+                var a = _ctx.Actors.FirstOrDefault(x => x.Id == finished[i]);
+                if (a == null) continue;
+                int lane = i % 3, rank = i / 3;
+                a.Pos = Stage.Clamp(farX - rank * 64f, Stage.Spread(lane, 3, Stage.CenterY - 150f, Stage.CenterY + 150f));
+            }
+
+            if (!string.IsNullOrEmpty(_activeId) && _walkers.TryGetValue(_activeId, out var aw)
+                && aw.Alive && !aw.Finished)
+            {
+                var a = _ctx.Actors.FirstOrDefault(x => x.Id == _activeId);
+                if (a != null)
+                {
+                    // (_frontier + 0.5) / rows = the centre of the frontier pane row,
+                    // the same basis the view uses for the panes.
+                    float t = _rows > 0 ? MathUtil.Clamp01((_frontier + 0.5f) / _rows) : 0f;
+                    a.Pos = Stage.Clamp(MathUtil.Lerp(bridgeX0, bridgeX1, t), Stage.CenterY);
+                    a.Facing = 0f;
+                }
+            }
+        }
+
         public Snapshot BuildSnapshot()
         {
+            Layout();
             var fx = _fx.Count > 0 ? new List<Effect>(_fx) : null;
             _fx.Clear();
             return new Snapshot
@@ -222,7 +285,8 @@ namespace Eliminated.Sim.Games
                     Phase = _phase,
                     ActiveId = _activeId,
                     TurnTimeLeft = _phase == "choose" ? System.Math.Max(0f, _timer) : 0f,
-                    RevealedSides = _pattern.Select((s, r) => _revealed[r] ? s : -1).ToList()
+                    RevealedSides = _pattern.Select((s, r) => _revealed[r] ? s : -1).ToList(),
+                    BrokeSide = new List<int>(_brokeSide)
                 }
             };
         }
@@ -234,7 +298,8 @@ namespace Eliminated.Sim.Games
             public string Phase;
             public string ActiveId;
             public float TurnTimeLeft;
-            public List<int> RevealedSides;
+            public List<int> RevealedSides; // per row: -1 unknown, else the SAFE side (0=top,1=bottom)
+            public List<int> BrokeSide;     // per row: the side a player shattered on (-1 = none)
         }
     }
 }

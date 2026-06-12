@@ -37,6 +37,11 @@ namespace Eliminated.Sim.Room
         public int RoundIndex { get; private set; }     // completed rounds
         public int TotalRounds { get; private set; }
         public bool TotalRoundsKnown { get; private set; }
+        // True when the current/upcoming round is the last scheduled game (or a
+        // Hardcore overtime round). Safe to expose even in Mystery mode: it reveals
+        // only "this is the finale", never the hidden total. The authoritative
+        // source for the finale music + announcer cue, online and offline.
+        public bool IsFinalGame => IsFinalRound();
         public GameId? CurrentGame { get; private set; }
         public bool CurrentNight { get; private set; }
         public bool PlayStarted { get; private set; }
@@ -74,8 +79,12 @@ namespace Eliminated.Sim.Room
             _players.Add(p);
         }
 
+        /// <summary>Add an AI competitor. Refuses (returns null) once the room is
+        /// at <see cref="RoomConfig.MaxPlayers"/> so neither manual "add bot"
+        /// requests nor bot-fill can ever overflow the lobby cap.</summary>
         public Player AddBot()
         {
+            if (Competitors().Count >= Config.MaxPlayers) return null;
             var bot = new Player("bot_" + (++_botSeq), BotNames.Random(_rng), BotNames.RandomCharacter(_rng), isBot: true)
             {
                 Number = AssignNumber()
@@ -302,6 +311,7 @@ namespace Eliminated.Sim.Room
                 Id = p.Id,
                 Name = p.Name,
                 CharacterId = p.CharacterId,
+                Accessories = p.Accessories,
                 Number = p.Number,
                 IsBot = p.IsBot || !p.Connected // disconnected humans idle (no AI)
             }).ToList();

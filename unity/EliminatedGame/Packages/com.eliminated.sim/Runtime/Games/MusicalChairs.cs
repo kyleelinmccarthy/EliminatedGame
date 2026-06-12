@@ -266,7 +266,13 @@ namespace Eliminated.Sim.Games
             Fake = Fake,
             Night = Ctx.Night,
             Chairs = _chairs.Select(c => new ChairView { X = c.X, Y = c.Y, Claimed = c.By != null }).ToList(),
-            Pickups = _phase == McPhase.Music ? _powerups.Snapshot() : new List<PickupView>()
+            Pickups = _phase == McPhase.Music ? _powerups.Snapshot() : new List<PickupView>(),
+            // Anyone who's been STILL too long during the music is in danger — the view floats a
+            // "MOVE!" countdown over them (and the HUD a personal alarm) so the rule is unmissable.
+            Warn = _phase == McPhase.Music
+                ? Alive.Where(a => a.Get("stillT") >= StillWarn)
+                       .Select(a => new WarnView { Id = a.Id, Left = Math.Max(0f, StillGrace - a.Get("stillT")) }).ToList()
+                : new List<WarnView>()
         };
 
         public sealed class McData
@@ -278,7 +284,9 @@ namespace Eliminated.Sim.Games
             public bool Night;
             public List<ChairView> Chairs;
             public List<PickupView> Pickups;
+            public List<WarnView> Warn; // alive players standing still too long (danger)
         }
         public struct ChairView { public float X, Y; public bool Claimed; }
+        public struct WarnView { public string Id; public float Left; }
     }
 }

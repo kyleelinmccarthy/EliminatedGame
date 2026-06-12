@@ -79,6 +79,29 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
+        public void Result_locks_then_plays_the_pit_fall_beat_before_ending()
+        {
+            // The losing team is hauled over the edge in the live arena (FallProgress 0→1)
+            // BEFORE the round ends, so the plunge isn't hidden under the results overlay.
+            var (g, _) = Make(1, 1, seed: 3);
+            int loserAtLock = -1;
+            for (int i = 0; i < 30 * 20 && !g.IsDone; i++)
+            {
+                g.OnInput("h0", GameInput.Tap());
+                g.Tick(Constants.Dt);
+                if (g.LoserTeam >= 0 && loserAtLock < 0)
+                {
+                    loserAtLock = g.LoserTeam;
+                    Assert.False(g.IsDone);          // result known, but the haul hasn't finished
+                    Assert.True(g.FallProgress < 1f);
+                }
+            }
+            Assert.True(loserAtLock >= 0);            // a loser WAS locked in
+            Assert.True(g.IsDone);                    // and the round eventually ended
+            Assert.Equal(1f, g.FallProgress, 3);      // fully fallen by the end
+        }
+
+        [Fact]
         public void Bots_tap_on_their_own_over_time()
         {
             var (g, _) = Make(0, 2);

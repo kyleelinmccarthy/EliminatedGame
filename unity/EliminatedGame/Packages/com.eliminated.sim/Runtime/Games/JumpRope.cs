@@ -144,8 +144,34 @@ namespace Eliminated.Sim.Games
 
             var aliveAll = _jumpers.Values.Where(j => j.Alive).ToList();
             int stillCrossing = aliveAll.Count(j => !j.Crossed);
-            if (aliveAll.Count <= _target || aliveAll.Count <= 1 || stillCrossing == 0 || _swing >= _maxSwings)
-                _done = true;
+            // Run the FULL crossing — don't bail the instant the cull target is hit (with a high
+            // early-round target that's after a SINGLE stumble, so nobody crosses and the round
+            // "ends itself"). End only when everyone alive has crossed/fallen or the rope is spent;
+            // the buzzer then sweeps the slowest stragglers off down to the survivor target.
+            if (aliveAll.Count <= 1 || stillCrossing == 0) _done = true;
+            else if (_swing >= _maxSwings) BuzzerCull();
+        }
+
+        // The rope is spent. Crossers are safe; the players still stuck on the bridge are swept off,
+        // furthest-back first, down to the survivor target — so a round always plays out a real race
+        // and THEN culls, rather than ending after the first mistimed jump.
+        private void BuzzerCull()
+        {
+            var alive = _jumpers.Values.Where(j => j.Alive).ToList();
+            int crossed = alive.Count(j => j.Crossed);
+            var onBridge = alive.Where(j => !j.Crossed).OrderByDescending(j => j.Pos).ThenBy(j => j.Id, StringComparer.Ordinal).ToList();
+            int keep = Math.Max(0, _target - crossed);   // spare the furthest-along to reach the target
+            if (crossed == 0) keep = Math.Max(keep, 1);  // never wipe the whole field
+            keep = Math.Min(keep, onBridge.Count);
+            for (int i = keep; i < onBridge.Count; i++)
+            {
+                var j = onBridge[i];
+                j.Alive = false;
+                SyncActor(j.Id, false);
+                _elim.Add((j.Id, $"Ran out of rope on plank {j.Pos + 1}"));
+                _fx.Add(new Effect(EffectKind.Death));
+            }
+            _done = true;
         }
 
         public void Forfeit(string playerId)
@@ -156,7 +182,7 @@ namespace Eliminated.Sim.Games
             _elim.Add((playerId, $"Bailed off the bridge on plank {j.Pos + 1}"));
             var aliveAll = _jumpers.Values.Where(x => x.Alive).ToList();
             int stillCrossing = aliveAll.Count(x => !x.Crossed);
-            if (aliveAll.Count <= _target || aliveAll.Count <= 1 || stillCrossing == 0) _done = true;
+            if (aliveAll.Count <= 1 || stillCrossing == 0) _done = true;
         }
 
         private void SyncActor(string id, bool alive)
@@ -178,8 +204,31 @@ namespace Eliminated.Sim.Games
             return RankingUtil.Crown(Id, survivors, _elim, _ctx.ForceSingleSurvivor, "Still on the bridge at the buzzer");
         }
 
+        // String the jumpers across the bridge: x tracks how many planks they've
+        // cleared (start at the left, safe far side on the right), each in their
+        // own lane. A jump nudges them forward so the hop reads in the top-down view.
+        private void Layout()
+        {
+            var ordered = _jumpers.Values.OrderBy(j => j.Id, StringComparer.Ordinal).ToList();
+            int n = ordered.Count;
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                var j = ordered[i];
+                var a = _ctx.Actors.FirstOrDefault(x => x.Id == j.Id);
+                if (a == null) continue;
+                float t = _bridgeLen > 0 ? MathUtil.Clamp01(j.Pos / (float)_bridgeLen) : 0f;
+                float x = MathUtil.Lerp(Stage.MinX + 30f, Stage.MaxX - 30f, t);
+                if (_nowMs < j.AirborneUntil) x += 32f; // a small forward hop on the jump
+                float y = Stage.Spread(i, n, Stage.MinY + 20f, Stage.MaxY - 20f);
+                a.Pos = Stage.Clamp(x, y);
+                a.Facing = 0f; // crossing toward the right
+                a.Progress = t;
+            }
+        }
+
         public Snapshot BuildSnapshot()
         {
+            Layout();
             var fx = _fx.Count > 0 ? new List<Effect>(_fx) : null;
             _fx.Clear();
             return new Snapshot

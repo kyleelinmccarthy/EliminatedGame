@@ -20,4 +20,3 @@ Produced by `tools/SfxGen` (re-run: `dotnet run --project tools/SfxGen -- <this-
 - `jump.wav` — 0.20s
 - `drum.wav` — 0.20s
 - `win.wav` — 0.70s
-- `music.wav` — 4.16s

@@ -27,12 +27,14 @@ namespace Eliminated.Sim.Tests.Economy
         }
 
         [Theory]
-        [InlineData(1, "The Last Blob Standing")]
+        [InlineData(1, "The Last Player Standing")]
         [InlineData(2, "First Loser")]
         [InlineData(3, "Bronze Is Just Shiny Last")]
         [InlineData(4, "Mid-Tier Menace")]
-        [InlineData(5, "Cannon Fodder")]
-        [InlineData(9, "Cannon Fodder")] // beyond the list clamps to last
+        [InlineData(5, "Almost Clutch")]
+        [InlineData(9, "Comic Relief")]
+        [InlineData(16, "Cannon Fodder")]
+        [InlineData(20, "Cannon Fodder")] // beyond the list clamps to last
         public void Titles_by_placement(int placement, string expected)
         {
             Assert.Equal(expected, Marbles.PlacementTitle(placement));

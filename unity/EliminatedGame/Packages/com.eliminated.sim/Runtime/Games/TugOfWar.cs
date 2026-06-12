@@ -39,11 +39,15 @@ namespace Eliminated.Sim.Games
         private readonly float[] _force = { 0f, 0f };
         private readonly List<Effect> _fx = new List<Effect>();
 
+        private const float FallDur = 1.5f; // the losing team is hauled over the edge before the round ends
+
         private float _ropePos;     // −1 (team1 wins) .. +1 (team0 wins)
         private float _elapsed;
         private float _secondTimer;
         private bool _done;
         private int _loserTeam = -1;
+        private bool _falling;      // result decided; playing the haul-into-the-pit beat
+        private float _fallT;
 
         public TugOfWar(GameContext ctx)
         {
@@ -57,6 +61,8 @@ namespace Eliminated.Sim.Games
         // ── Inspection (used by the view and tests) ──────────────────────
         public float RopePos => _ropePos;
         public int LoserTeam => _loserTeam;
+        /// <summary>0→1 progress of the "haul the losers into the pit" beat once the result is locked.</summary>
+        public float FallProgress => _falling ? MathUtil.Clamp01(_fallT / FallDur) : (_done ? 1f : 0f);
         public int TeamOf(string id) => _pullers.TryGetValue(id, out var p) ? p.Team : -1;
         public int TapsFor(string id) => _pullers.TryGetValue(id, out var p) ? p.Taps : 0;
         public int TeamCount(int team) => _pullers.Values.Count(p => p.Team == team);
@@ -94,6 +100,17 @@ namespace Eliminated.Sim.Games
         public void Tick(float dt)
         {
             if (_done) return;
+
+            // Result locked: hold the rope at the winner's side and play the haul-into-the-pit
+            // beat. Only after the losers are over the edge does the round actually end, so the
+            // plunge is visible in the live arena rather than hidden under the results overlay.
+            if (_falling)
+            {
+                _fallT += dt;
+                if (_fallT >= FallDur) _done = true;
+                return;
+            }
+
             _elapsed += dt;
             _secondTimer += dt;
             if (_secondTimer >= 1f)
@@ -128,15 +145,21 @@ namespace Eliminated.Sim.Games
             _force[0] *= Decay;
             _force[1] *= Decay;
 
-            if (_ropePos >= Win) Finish(1);
-            else if (_ropePos <= -Win) Finish(0);
-            else if (_elapsed >= TimeLimit) Finish(_ropePos >= 0 ? 1 : 0);
+            if (_ropePos >= Win) BeginFall(1);
+            else if (_ropePos <= -Win) BeginFall(0);
+            else if (_elapsed >= TimeLimit) BeginFall(_ropePos >= 0 ? 1 : 0);
         }
 
-        private void Finish(int loserTeam)
+        // Lock the result and start the pit-fall beat: snap the rope fully to the winner's
+        // side (so the knot finishes its slide) and flag the loser. _done follows in Tick
+        // once FallDur elapses.
+        private void BeginFall(int loserTeam)
         {
+            if (_falling) return;
             _loserTeam = loserTeam;
-            _done = true;
+            _falling = true;
+            _fallT = 0f;
+            _ropePos = loserTeam == 1 ? Win : -Win;
             _fx.Add(new Effect(EffectKind.Death, loserTeam == 0 ? -1f : 1f, 0f));
         }
 
@@ -179,8 +202,49 @@ namespace Eliminated.Sim.Games
             if (a != null) a.Alive = alive;
         }
 
+        // Arrange the two teams either side of the rope so the top-down view
+        // shows a real tug: team 0 on the left, team 1 on the right, the whole
+        // knot sliding toward the winning side as the rope is dragged over.
+        private void Layout()
+        {
+            // The rope slides toward the WINNING team, dragging the loser to the
+            // central pit (as in the web: the knot is pulled to the winner's side).
+            // +rope = team 0 (left) winning → mid slides LEFT toward team 0, so
+            // team 1 on the right gets hauled in. The view rope + HUD knob use the
+            // same sign so player formation, rope prop, and knob all agree.
+            float mid = Stage.CenterX - MathUtil.Clamp(_ropePos, -1f, 1f) * 220f;
+            var team0 = new List<Actor>();
+            var team1 = new List<Actor>();
+            foreach (var a in _ctx.Actors)
+            {
+                if (!_pullers.TryGetValue(a.Id, out var p)) continue;
+                (p.Team == 0 ? team0 : team1).Add(a);
+            }
+            LayoutTeam(team0, mid, -1);
+            LayoutTeam(team1, mid, +1);
+        }
+
+        // dir −1 = the team standing left of the rope, +1 = right of it.
+        private static void LayoutTeam(List<Actor> team, float mid, int dir)
+        {
+            const float laneGap = 96f;   // spacing across the rope
+            const float rankGap = 86f;   // spacing back from the rope
+            const int lanes = 4;
+            for (int i = 0; i < team.Count; i++)
+            {
+                int lane = i % lanes;
+                int rank = i / lanes;
+                int used = Math.Min(lanes, team.Count - rank * lanes);
+                float y = Stage.CenterY + (lane - (used - 1) * 0.5f) * laneGap;
+                float x = mid + dir * (74f + rank * rankGap);
+                team[i].Pos = Stage.Clamp(x, y);
+                team[i].Facing = dir > 0 ? (float)Math.PI : 0f; // lean into the rope
+            }
+        }
+
         public Snapshot BuildSnapshot()
         {
+            Layout();
             List<Effect> fx = _fx.Count > 0 ? new List<Effect>(_fx) : null;
             _fx.Clear();
             return new Snapshot
@@ -193,7 +257,10 @@ namespace Eliminated.Sim.Games
                 {
                     RopePos = _ropePos,
                     TimeLeft = Math.Max(0f, TimeLimit - _elapsed),
-                    LoserTeam = _loserTeam
+                    LoserTeam = _loserTeam,
+                    FallT = FallProgress,
+                    Team0Count = TeamCount(0),
+                    Team1Count = TeamCount(1)
                 }
             };
         }
@@ -204,6 +271,8 @@ namespace Eliminated.Sim.Games
             public float RopePos;
             public float TimeLeft;
             public int LoserTeam;
+            public float FallT; // 0→1 haul-into-the-pit progress (the view drags + drops the losers)
+            public int Team0Count, Team1Count; // current puller headcount per side (HUD labels)
         }
     }
 }

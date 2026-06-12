@@ -2,8 +2,8 @@
 
 **A wholesome party game where everyone dies.** Childhood playground games meet
 elimination-show stakes and boomerang-fu chaos. A sinister Game Master runs the
-gauntlet; your blob runs out of luck. Get eliminated and your blob is neatly
-boxed up with a little pink bow on top. The last blob standing keeps the
+gauntlet; your player runs out of luck. Get eliminated and your player is neatly
+boxed up with a little pink bow on top. The last player standing keeps the
 **Marbles** ◍ and a fistful of bragging rights that, legally, are worth nothing.
 
 This repository is the **Unity 6 / C# remake** of the original web game
@@ -37,7 +37,7 @@ beyond.
 
 The headline content is **16 minigames** (12 marquee + 4 extra), bots with
 per-game AI, a Game Master that reveals a mystery sequence, Hardcore (permadeath)
-and Casual (points) rules, Night Mode, powerups, 6 themed arenas, 16 blob
+and Casual (points) rules, Night Mode, powerups, 6 themed arenas, 16 player
 characters + accessories, persistent Marbles currency and a leaderboard.
 
 ---
@@ -113,7 +113,11 @@ installers — Windows / Linux / Steam Deck / Android / WebGL — are built by
 
 Open `unity/EliminatedGame/` in **Unity Hub** with **Unity 6 LTS (6000.x)**.
 The simulation compiles automatically as the embedded package
-`com.eliminated.sim`. Press Play on `Assets/Eliminated/Scenes/Boot.unity`.
+`com.eliminated.sim`. The slice is **code-driven — there is no scene to set
+up**: a `RuntimeInitializeOnLoadMethod` bootstrap (`GameBootstrapper`) builds
+the camera, arena, input, and UI on Play. Just open any scene (*File → New
+Scene → Empty* is fine) and press **Play**. See [docs/UNITY_SETUP.md](docs/UNITY_SETUP.md)
+for the full walkthrough.
 
 > This repo uses **Git LFS** for binary assets (models, textures, audio, fonts).
 > Run `git lfs install` once after cloning.

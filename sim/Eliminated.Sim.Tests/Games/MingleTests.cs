@@ -45,7 +45,7 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
-        public void Correct_group_survives_and_a_lonely_blob_is_eliminated()
+        public void Correct_group_survives_and_a_lonely_player_is_eliminated()
         {
             var (g, actors) = Make(6, 0, seed: 3); // humans → only move where we place them
             // advance to the mingle call
@@ -55,9 +55,9 @@ namespace Eliminated.Sim.Tests.Games
             int n = g.CallN;
             var room0 = g.Rooms[0];
             var room1 = g.Rooms[1];
-            // exactly N blobs form the correct group in room 0
+            // exactly N players form the correct group in room 0
             for (int i = 0; i < n; i++) actors[i].Pos = new Vec2(room0.X, room0.Y);
-            // one lonely blob in room 1 (too few)
+            // one lonely player in room 1 (too few)
             actors[n].Pos = new Vec2(room1.X, room1.Y);
             // any remainder stay on the platform (also doomed)
             for (int i = n + 1; i < actors.Count; i++) actors[i].Pos = new Vec2(Mingle.PlatformX, Mingle.PlatformY);
@@ -65,7 +65,7 @@ namespace Eliminated.Sim.Tests.Games
             for (int i = 0; i < 200 && g.CurrentPhase == Mingle.MinglePhase.Mingle; i++) g.Tick(Constants.Dt);
 
             for (int i = 0; i < n; i++) Assert.True(actors[i].Alive, $"group member {i} should survive");
-            Assert.False(actors[n].Alive); // the lonely blob is out
+            Assert.False(actors[n].Alive); // the lonely player is out
         }
 
         [Fact]

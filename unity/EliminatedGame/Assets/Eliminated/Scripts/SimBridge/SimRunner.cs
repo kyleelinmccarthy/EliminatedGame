@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Eliminated.Sim.Core;
 using Eliminated.Sim.Model;
@@ -13,8 +14,9 @@ namespace Eliminated.Game.SimBridge
         public string Id;
         public string Name;
         public string CharacterId;
-        public LocalPlayerInfo(string id, string name, string characterId)
-        { Id = id; Name = name; CharacterId = characterId; }
+        public List<string> Accessories;
+        public LocalPlayerInfo(string id, string name, string characterId, List<string> accessories = null)
+        { Id = id; Name = name; CharacterId = characterId; Accessories = accessories; }
     }
 
     /// <summary>
@@ -33,32 +35,57 @@ namespace Eliminated.Game.SimBridge
         public RoomPhase Phase => Room?.Phase ?? RoomPhase.Lobby;
         public bool HasSeries => Room != null;
 
+        // ── Session surface (delegates straight to the in-process room) ──
+        public GameId? CurrentGame => Room?.CurrentGame;
+        public int RoundIndex => Room?.RoundIndex ?? 0;
+        // Mirrors GameRoom.IsFinalRound(): the last scheduled round (RoundIndex is the current
+        // 0-based round), so the finale music cue starts at its intro and holds through any
+        // Hardcore overtime rounds, which also satisfy RoundIndex >= TotalRounds - 1.
+        public bool IsFinalGame => Room != null && Room.TotalRounds > 0 && Room.RoundIndex >= Room.TotalRounds - 1;
+        public bool PlayStarted => Room?.PlayStarted ?? false;
+        public string ChampionId => Room?.SeriesResult?.ChampionId;
+        public RoundReport LastRoundReport => Room?.LastRoundReport;
+        public SeriesResult SeriesResult => Room?.SeriesResult;
+        public string NameOf(string playerId)
+            => Room?.Players.FirstOrDefault(p => p.Id == playerId)?.Name ?? playerId;
+
         /// <summary>The local human player ids in join order (1+ for co-op).</summary>
         public IReadOnlyList<string> LocalPlayerIds => _localIds;
         private readonly List<string> _localIds = new List<string>();
 
         private float _accumulator;
 
-        /// <summary>Start a solo-vs-bots series hosted locally.</summary>
+        /// <summary>Start a solo-vs-bots series hosted locally. <paramref name="fieldSize"/>
+        /// (0 = default 12) caps the total contestant count, i.e. how many bots fill in;
+        /// <paramref name="allowedGames"/> (null/empty = all) restricts the game pool.</summary>
         public void HostLocalSeries(SeriesMode mode, RoundsMode rounds,
-            string playerName = "You", string characterId = "avo")
+            string playerName = "You", string characterId = "avo", List<string> accessories = null,
+            int fieldSize = 0, List<GameId> allowedGames = null)
         {
             HostLocalCoop(mode, rounds, new List<LocalPlayerInfo>
             {
-                new LocalPlayerInfo(LocalPlayerId, playerName, characterId)
-            });
+                new LocalPlayerInfo(LocalPlayerId, playerName, characterId, accessories)
+            }, fieldSize, allowedGames);
         }
 
         /// <summary>Start a local series with one or more local humans (co-op); bots fill the rest.</summary>
-        public void HostLocalCoop(SeriesMode mode, RoundsMode rounds, List<LocalPlayerInfo> locals)
+        public void HostLocalCoop(SeriesMode mode, RoundsMode rounds, List<LocalPlayerInfo> locals,
+            int fieldSize = 0, List<GameId> allowedGames = null)
         {
             int seed = System.Environment.TickCount;
             Room = new GameRoom(RoomCode.Make(seed), seed);
-            Room.UpdateConfig(new RoomConfig { Mode = mode, Rounds = rounds, BotFill = true });
+            var cfg = new RoomConfig { Mode = mode, Rounds = rounds, BotFill = true };
+            // fieldSize caps total players: GameRoom bot-fills until _players.Count == MaxPlayers,
+            // so MaxPlayers = N yields N-1 bots + the human(s).
+            if (fieldSize > 0) cfg.MaxPlayers = Mathf.Clamp(fieldSize, Constants.MinToStart, Constants.MaxPlayers);
+            if (allowedGames != null && allowedGames.Count > 0) cfg.AllowedGames = allowedGames;
+            Room.UpdateConfig(cfg);
             _localIds.Clear();
             foreach (var p in locals)
             {
-                Room.AddPlayer(new Player(p.Id, p.Name, p.CharacterId, isBot: false));
+                var player = new Player(p.Id, p.Name, p.CharacterId, isBot: false);
+                if (p.Accessories != null) player.Accessories = new List<string>(p.Accessories);
+                Room.AddPlayer(player);
                 _localIds.Add(p.Id);
             }
             Room.StartSeries();

@@ -63,6 +63,17 @@ namespace Eliminated.Sim.Tests.Localization
         }
 
         [Fact]
+        public void Every_arena_room_has_an_english_name_and_a_room_intro()
+        {
+            Loc.SetLocale("en");
+            // Each arena floor theme (ArenaThemes.All in the Unity client) gets a flavour
+            // name announced at the round intro; lock that they all resolve to real text.
+            foreach (var theme in new[] { "courtyard", "neon", "candy", "toxic", "beach", "haunt" })
+                Assert.NotEqual("room." + theme, Loc.GetIn("en", "room." + theme));
+            Assert.Equal("Welcome to Candy Kingdom!", Loc.Get("gm.room_intro", Loc.Get("room.candy")));
+        }
+
+        [Fact]
         public void Unknown_key_returns_the_key()
         {
             Assert.Equal("nope.nope", Loc.GetIn("en", "nope.nope"));

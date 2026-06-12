@@ -8,7 +8,7 @@ namespace Eliminated.Sim.Games
 {
     /// <summary>
     /// Free-for-all boomerang brawl. Throw a returning rang, dodge incoming ones,
-    /// grab combat powerups, last blob standing. Has its own power set and dash
+    /// grab combat powerups, last player standing. Has its own power set and dash
     /// (separate from the shared catalog). Ported from
     /// lib/server/games/Boomerang.ts. Finale-capable (forces a single survivor).
     /// </summary>
@@ -377,7 +377,7 @@ namespace Eliminated.Sim.Games
             }).ToList(),
             Pickups = _pickups.Select(p => new Eliminated.Sim.Powerups.PickupView
             {
-                Id = p.Id, Kind = p.Kind.ToString(), X = p.Pos.X, Y = p.Pos.Y, Bob = p.Bob
+                Id = p.Id, Kind = p.Kind.ToString(), X = p.Pos.X, Y = p.Pos.Y, Bob = p.Bob, Good = true // all boomerang powerups are blessings
             }).ToList()
         };
 

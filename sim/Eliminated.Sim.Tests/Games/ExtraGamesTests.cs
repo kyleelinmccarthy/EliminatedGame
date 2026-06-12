@@ -55,6 +55,36 @@ namespace Eliminated.Sim.Tests.Games
             Assert.Equal(6, g.Result().Ranking.Count);
         }
 
+        [Fact]
+        public void Chutes_culls_a_meaningful_fraction_not_everyone_wins()
+        {
+            // Regression for "too easy — everyone wins". Average eliminated across seeds
+            // must be clearly above zero at high intensity (the tightened clock + cull).
+            int totalElim = 0, runs = 12;
+            for (int seed = 0; seed < runs; seed++)
+            {
+                var actors = Bots(12);
+                var g = new ChutesAndLadders(Ctx(actors, seed, intensity: 0.9f));
+                g.Start();
+                int ticks = 0;
+                while (!g.IsDone && ticks < 60 * 20) { g.Tick(Constants.Dt); ticks++; }
+                totalElim += actors.Count(a => !a.Alive);
+            }
+            Assert.True(totalElim / (float)runs >= 3f, $"avg eliminated {totalElim / (float)runs:0.0} — cull too weak");
+        }
+
+        [Fact]
+        public void Chutes_finale_crowns_a_single_survivor()
+        {
+            var actors = Bots(8);
+            var g = new ChutesAndLadders(Ctx(actors, 7, forceSingle: true));
+            g.Start();
+            int ticks = 0;
+            while (!g.IsDone && ticks < 60 * 20) { g.Tick(Constants.Dt); ticks++; }
+            Assert.True(g.IsDone);
+            Assert.Single(g.Result().SurvivorIds);
+        }
+
         // ── Keepy Uppy ───────────────────────────────────────────────────
         [Fact]
         public void Keepy_balloon_hitting_the_floor_eliminates_its_owner()
