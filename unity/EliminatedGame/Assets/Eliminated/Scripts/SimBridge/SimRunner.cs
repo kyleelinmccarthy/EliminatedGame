@@ -48,6 +48,8 @@ namespace Eliminated.Game.SimBridge
         public SeriesResult SeriesResult => Room?.SeriesResult;
         public string NameOf(string playerId)
             => Room?.Players.FirstOrDefault(p => p.Id == playerId)?.Name ?? playerId;
+        public int NumberOf(string playerId)
+            => Room?.Players.FirstOrDefault(p => p.Id == playerId)?.Number ?? 0;
 
         /// <summary>The local human player ids in join order (1+ for co-op).</summary>
         public IReadOnlyList<string> LocalPlayerIds => _localIds;

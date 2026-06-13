@@ -55,20 +55,28 @@ namespace Eliminated.Game.View
 
             var doll = Instantiate(prefab, root.transform);
             doll.transform.localPosition = Vector3.zero;
-            doll.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // face the camera
+            doll.transform.localRotation = Quaternion.identity;
+            doll.transform.localScale = Vector3.one;
             SetLayer(doll, PortraitLayer);
 
             var rends = doll.GetComponentsInChildren<Renderer>(true);
             if (rends.Length == 0) { _failed = true; Cleanup(); return; }
 
-            Bounds b = rends[0].bounds;
-            for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
-            float hgt = Mathf.Max(0.001f, b.size.y);
+            // Auto-stand + auto-scale from SHARED-MESH bounds (a skinned mesh's world bounds are stale
+            // right after Instantiate — measuring those is what made her giant/sideways).
+            Bounds nat = MeshBounds(rends, doll.transform.worldToLocalMatrix);
+            Vector3 s = nat.size;
+            Quaternion stand =
+                (s.y >= s.x && s.y >= s.z) ? Quaternion.identity
+              : (s.z >= s.x && s.z >= s.y) ? Quaternion.Euler(90f, 0f, 0f)   // Z-up → Y-up
+              :                              Quaternion.Euler(0f, 0f, 90f);  // X-up → Y-up
+            doll.transform.localRotation = stand * Quaternion.Euler(0f, 180f, 0f); // stand, then face the camera
+
+            Bounds w = MeshBounds(rends, Matrix4x4.identity);
+            float hgt = Mathf.Max(0.001f, w.size.y);
             doll.transform.localScale = Vector3.one * (2.4f / hgt); // ~2.4 units tall in the portrait
-            // re-measure and centre on the root so the framing is consistent for any FBX size.
-            b = rends[0].bounds;
-            for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
-            doll.transform.position += root.transform.position - b.center;
+            w = MeshBounds(rends, Matrix4x4.identity);
+            doll.transform.position += root.transform.position - w.center; // centre in frame
 
             var lightGo = new GameObject("DollPortraitLight");
             lightGo.transform.SetParent(root.transform, false);
@@ -111,6 +119,29 @@ namespace Eliminated.Game.View
         {
             go.layer = layer;
             foreach (Transform t in go.transform) SetLayer(t.gameObject, layer);
+        }
+
+        // Combined AABB of every mesh, transformed by toFrame × the renderer's localToWorld. Uses
+        // sharedMesh.bounds (always valid, even before a skinned mesh first renders).
+        private static Bounds MeshBounds(Renderer[] rends, Matrix4x4 toFrame)
+        {
+            bool has = false; Bounds acc = default;
+            foreach (var r in rends)
+            {
+                if (r == null) continue;
+                Mesh m = (r is SkinnedMeshRenderer smr) ? smr.sharedMesh
+                       : (r.TryGetComponent<MeshFilter>(out var mf) ? mf.sharedMesh : null);
+                if (m == null) continue;
+                Bounds mb = m.bounds; Vector3 c = mb.center, e = mb.extents;
+                Matrix4x4 mtx = toFrame * r.localToWorldMatrix;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = c + new Vector3((i & 1) == 0 ? -e.x : e.x, (i & 2) == 0 ? -e.y : e.y, (i & 4) == 0 ? -e.z : e.z);
+                    var p = mtx.MultiplyPoint3x4(corner);
+                    if (!has) { acc = new Bounds(p, Vector3.zero); has = true; } else acc.Encapsulate(p);
+                }
+            }
+            return acc;
         }
     }
 }

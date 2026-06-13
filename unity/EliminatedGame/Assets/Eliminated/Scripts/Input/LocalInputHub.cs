@@ -39,6 +39,14 @@ namespace Eliminated.Game.Input
             for (int i = 0; i < ids.Count; i++)
             {
                 var c = ReadControls(i, coop, game);
+                // Red Light is a horizontal race toward the doll on the RIGHT, so "forward" (W / ↑ /
+                // D / →) must drive +x and "back" (S / ↓ / A / ←) −x — pressing W runs you toward the
+                // finish, not upward. (Lane drifting isn't needed; it's a straight dash.)
+                if (game == GameId.RedLight)
+                {
+                    c.Dx = Mathf.Clamp(c.Dx - c.Dy, -1f, 1f);
+                    c.Dy = 0f;
+                }
                 _sim.SubmitFor(ids[i], GameInput.Move(c.Dx, c.Dy));
                 if (c.Primary)
                 {

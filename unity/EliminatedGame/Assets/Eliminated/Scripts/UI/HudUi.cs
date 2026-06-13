@@ -47,6 +47,20 @@ namespace Eliminated.Game.UI
         private string _capSimon;     // last Simon command captioned
         private float _elimVoiceUntil; // throttle the elimination voiceline (trickle deaths shouldn't stutter)
 
+        // Games where eliminations trickle in by hunting/attrition over the round: a running
+        // number callout would be chatty (and, for Prop Hunt, half spoils the find), so the
+        // voice is HELD and the whole round's casualties are read once at the buzzer
+        // ("Players 1, 2, 3, 4 have been eliminated."). Captions still show per death.
+        private static readonly HashSet<GameId> DeferElimGames = new HashSet<GameId>
+        {
+            GameId.PropHunt, GameId.RedLight, GameId.Tag, GameId.Boomerang, GameId.Dodgeball, GameId.KingOfTheHill,
+        };
+        private readonly List<int> _deferredOut = new List<int>(); // tags banked for the round-end call
+
+        private float _announcerBusyUntil; // Time.time the current announcer line finishes
+        private bool _revealPending;       // the next round's reveal is held until she's done
+        private float _revealAt;           // when to fire that held reveal
+
         // Front-of-house navigation. The menu is a little router: one page visible
         // at a time, with a nav bar on the home page and a back button elsewhere.
         private enum Page { Menu, Settings, Leaderboard, HowToPlay, PatchNotes, Account, Controls, Players, Online, Credits }
@@ -481,6 +495,13 @@ namespace Eliminated.Game.UI
                 _lastPhase = phase;
             }
 
+            // Fire a reveal that was held behind a round-end casualty call, once she's done.
+            if (_revealPending && Time.time >= _revealAt)
+            {
+                _revealPending = false;
+                if (_router != null && _router.HasSeries && _router.CurrentGame != null) PlayReveal();
+            }
+
             UpdateMusic();                 // pick the background loop for the current screen/phase
             ScreenFx.Tick(Time.deltaTime); // decay screen juice (shake/flash)
             UpdateCaptions();              // refresh subtitle cues from the live snapshot
@@ -496,7 +517,11 @@ namespace Eliminated.Game.UI
         // Exception: in the EDITOR only, the lobby/menu ROTATES between Sinister and Pink Soldiers
         // (local-dev flavor). Pink Soldiers is unlicensed/editor-only, so a real build always uses
         // the fixed track above.
-        private static readonly string[] LobbyDevPlaylist = { "music_sinister", "music_dev" };
+        // The rotation advances per clip length, and Pink Soldiers (~28s seamless loop) is less than
+        // half the length of Sinister (~64s) — so a single pass felt jarringly brief next to it. Pink
+        // Soldiers is authored to loop seamlessly, so we list it twice to give it ~56s of airtime,
+        // balancing the two tracks in the cycle.
+        private static readonly string[] LobbyDevPlaylist = { "music_sinister", "music_dev", "music_dev" };
 
         private void UpdateMusic()
         {
@@ -504,9 +529,15 @@ namespace Eliminated.Game.UI
             if (audio == null) return;
             bool frontOfHouse = _router == null || !_router.HasSeries || _router.Phase == RoomPhase.Lobby;
             if (frontOfHouse && Application.isEditor) audio.SetMusicPlaylist(LobbyDevPlaylist);
-            // In a live round the music is "game sound" (rides the game-sound volume with
-            // SFX + announcer); menu/lobby music is background (its own music volume).
-            else audio.SetMusic(DesiredMusicTrack(), gameMusic: !frontOfHouse);
+            else
+            {
+                // music_danube is the Mingle / Musical Chairs MECHANIC music (you act when it
+                // stops), so it's "game sound": rides the game-sound volume with SFX + announcer
+                // and keeps playing when 🎵 mutes music. Every other loop — menu, lobby, regular
+                // rounds, the final, results — is background music on the music volume/toggle.
+                var track = DesiredMusicTrack();
+                audio.SetMusic(track, gameMusic: track == "music_danube");
+            }
         }
 
         private string DesiredMusicTrack()
@@ -567,6 +598,9 @@ namespace Eliminated.Game.UI
 
         private void OnPhaseChanged(RoomPhase from, RoomPhase to)
         {
+            // Leaving play (round over) — read out a hunt/attrition game's banked casualties.
+            if (from == RoomPhase.Playing) FlushDeferredEliminations();
+
             // A series just (re)started — re-arm marble banking for it. Covers both
             // local hosting and an online host pressing Start (Lobby → Intro).
             if (from == RoomPhase.Lobby && to != RoomPhase.Lobby) _seriesBanked = false;
@@ -574,18 +608,12 @@ namespace Eliminated.Game.UI
             switch (to)
             {
                 case RoomPhase.Intro:
+                    // The reveal waits its turn behind a round-end casualty call so the female
+                    // announcer is never cut off mid-readout (Update fires it when she's done).
                     if (_router.CurrentGame != null)
                     {
-                        // Announce the game AND the room it's played in ("…Boomerang Brawl.
-                        // The arena: Candy Kingdom."). The room is derived from the same (round,
-                        // game) the arena renders, so the caption always names the floor on screen.
-                        // 7s holds the text through the longer ceremonial voice line below.
-                        string roomTheme = ArenaThemes.ForRound(_router.RoundIndex, _router.CurrentGame);
-                        Caption(Loc.Get("gm.game_intro", _router.RoundIndex + 1, GameName(_router.CurrentGame.Value))
-                                + "  " + Loc.Get("gm.room_intro", ArenaThemes.DisplayName(roomTheme)), 7f);
-                        // Male announcer: the ceremonial PA reveal ("Attention, players. Game three.
-                        // Tug of war. The arena, Neon District."), the spoken clips matching the caption.
-                        Announcer.Game(_router.RoundIndex + 1, _router.CurrentGame.Value, _router.IsFinalGame, roomTheme);
+                        if (Time.time < _announcerBusyUntil) { _revealPending = true; _revealAt = _announcerBusyUntil; }
+                        else PlayReveal();
                     }
                     break;
                 case RoomPhase.SeriesResult:
@@ -662,25 +690,31 @@ namespace Eliminated.Game.UI
                 Caption(Loc.Get("gm.eliminated_one", _router.NameOf(outNow[0])), 2.4f);
             else
                 Caption(Loc.Get("gm.eliminated_many", outNow.Count), 2.4f);
-            // Female announcer calls the fallen out BY NUMBER — the tag over their head and
-            // on your HUD is the one you hear. One out → "Player N has been eliminated."; a
-            // same-tick wipe enumerates them → "Players 1, 2, 3, 4 … have been eliminated."
-            // Your own death jumps the throttle queue; otherwise deaths are spaced so a line
-            // isn't chopped, and the spacing scales with how many names the line reads.
+            // Hunt/attrition games hold the voice and bank the tags for one round-end call
+            // (see DeferElimGames / FlushDeferredEliminations); captions above still fire now.
+            if (DeferElimGames.Contains(snap.Game))
+            {
+                foreach (var id in outNow) { int n = NumberInSnap(snap, id); if (n > 0) _deferredOut.Add(n); }
+                return;
+            }
+            // Female announcer calls the fallen out BY NUMBER (digit by digit) — the tag over
+            // their head and on your HUD is the one you hear. One out → "Player five seven three
+            // has been eliminated."; a same-tick wipe enumerates them. Your own death jumps the
+            // queue; otherwise the next call waits until this whole line FINISHES (its real
+            // spoken length, returned by the announcer) plus a breath — so she's never cut off.
             if (localOut || Time.time >= _elimVoiceUntil)
             {
+                float dur;
                 if (outNow.Count == 1)
-                {
-                    Announcer.EliminatedByNumber(NumberInSnap(snap, outNow[0]));
-                    _elimVoiceUntil = Time.time + (localOut ? 2.6f : 1.9f);
-                }
+                    dur = Announcer.EliminatedByNumber(NumberInSnap(snap, outNow[0]));
                 else
                 {
                     var nums = new List<int>(outNow.Count);
                     foreach (var id in outNow) nums.Add(NumberInSnap(snap, id));
-                    Announcer.EliminatedMultiple(nums);
-                    _elimVoiceUntil = Time.time + 1.6f + nums.Count * 1.2f;
+                    dur = Announcer.EliminatedMultiple(nums);
                 }
+                _elimVoiceUntil = Time.time + (dur > 0f ? dur : 2f) + 0.5f;
+                if (dur > 0f) _announcerBusyUntil = Time.time + dur + 0.3f; // hold a reveal at the buzzer
             }
         }
 
@@ -691,6 +725,32 @@ namespace Eliminated.Game.UI
             if (snap?.Actors != null)
                 foreach (var a in snap.Actors) if (a.Id == id) return a.Number;
             return 0;
+        }
+
+        // Round over in a deferred game: read the whole round's casualties in one call
+        // ("Players five seven three, one two … have been eliminated."). Marks the announcer
+        // busy for the line's full length so the next round's reveal holds until she finishes.
+        // Called when leaving Playing, so it never carries over.
+        private void FlushDeferredEliminations()
+        {
+            if (_deferredOut.Count == 0) return;
+            float dur = _deferredOut.Count == 1
+                ? Announcer.EliminatedByNumber(_deferredOut[0])
+                : Announcer.EliminatedMultiple(_deferredOut);
+            _deferredOut.Clear();
+            if (dur > 0f) _announcerBusyUntil = Time.time + dur + 0.3f;
+        }
+
+        // The ceremonial round reveal ("Attention, players. Game three. Tug of war. The arena,
+        // Neon District."), caption + matching male voice. Held behind a round-end casualty
+        // call (see OnPhaseChanged / Update) so the two announcers never talk over each other.
+        private void PlayReveal()
+        {
+            if (_router.CurrentGame == null) return;
+            string roomTheme = ArenaThemes.ForRound(_router.RoundIndex, _router.CurrentGame);
+            Caption(Loc.Get("gm.game_intro", _router.RoundIndex + 1, GameName(_router.CurrentGame.Value))
+                    + "  " + Loc.Get("gm.room_intro", ArenaThemes.DisplayName(roomTheme)), 7f);
+            Announcer.Game(_router.RoundIndex + 1, _router.CurrentGame.Value, _router.IsFinalGame, roomTheme);
         }
 
         // Caption the marquee Game-Master cues that map to audio/visual signals a
@@ -816,7 +876,7 @@ namespace Eliminated.Game.UI
             DrawFlash(w, h);
             DrawCaption(w, h);
             DrawToast(w, h);
-            DrawMusicToggle(w, h);
+            DrawAudioToggles(w, h);
         }
 
         // Full-screen accessibility-gated flash (ScreenFx). Alpha is 0 while idle, so
@@ -1020,26 +1080,39 @@ namespace Eliminated.Game.UI
                 if (Pill(new Rect(px, y, widths[i], ph), labels[i])) _page = pages[i];
                 px += widths[i] + gap;
             }
+            DrawMuteAllButton(new Rect(px, y, muteW, ph));
+            px += muteW + gap;
+            DrawMusicButton(new Rect(px, y, musicW, ph));
+        }
+
+        // Mute-all speaker toggle. Mute-all IS master-volume-at-zero (one source of truth
+        // shared with the Settings slider), so muting here and the slider there can never
+        // disagree. Silences EVERYTHING — SFX, announcer, and both music buckets. Shared
+        // by the nav bar and the in-game corner controls.
+        private void DrawMuteAllButton(Rect r)
+        {
             var snd = SaveService.Current?.settings;
-            // Mute-all IS master-volume-at-zero (one source of truth shared with the Settings
-            // slider), so muting here and the slider there can never disagree.
             bool muted = snd != null && snd.masterVolume <= 0f;
-            if (AudioButton(new Rect(px, y, muteW, ph), muted ? "🔇" : "🔊", !muted) && snd != null)
+            if (AudioButton(r, muted ? "🔇" : "🔊", !muted) && snd != null)
             {
                 if (snd.masterVolume > 0f) { _premuteVolume = snd.masterVolume; snd.masterVolume = 0f; }
                 else snd.masterVolume = _premuteVolume > 0f ? _premuteVolume : 1f;
                 AudioListener.volume = snd.masterVolume;
                 SaveService.Save();
             }
-            px += muteW + gap;
-            // Separate music-only switch (the background loop), independent of the mute-all
-            // above and of game SFX. A red slash crosses the note when music is off, the way
-            // the speaker shows 🔇. Shares SetMusicEnabled with the Settings/in-game toggles
-            // so all three always agree.
+        }
+
+        // Background-music-only switch, independent of the mute-all and of game SFX —
+        // and of GAMEPLAY music (Mingle / Musical Chairs danube), which is a game cue
+        // and keeps playing while this is off. A red slash crosses the note when music
+        // is off, the way the speaker shows 🔇. Shares SetMusicEnabled with the Settings
+        // toggle so every control always agrees.
+        private void DrawMusicButton(Rect r)
+        {
+            var snd = SaveService.Current?.settings;
             bool musicOn = snd == null || snd.musicEnabled;
-            var musicR = new Rect(px, y, musicW, ph);
-            bool musicClick = AudioButton(musicR, "🎵", musicOn);
-            if (!musicOn) DrawSlash(musicR.center, 30f, 6f, Red);
+            bool musicClick = AudioButton(r, "🎵", musicOn);
+            if (!musicOn) DrawSlash(r.center, 30f, 6f, Red);
             if (musicClick && snd != null) SetMusicEnabled(!musicOn);
         }
 
@@ -1072,20 +1145,16 @@ namespace Eliminated.Game.UI
             return GUI.Button(r, GUIContent.none, GUIStyle.none);
         }
 
-        // In-game music switch (bottom-left): silences the music loop while leaving game
-        // SFX on. Drawn on every in-game phase so players can mute the music without
-        // leaving the round; mirrors the Settings + nav toggles via shared SetMusicEnabled.
-        // Floats alone over the dark arena/intro screens, so it uses the solid-pink
-        // AudioButton (a slash crosses the note when off).
-        private void DrawMusicToggle(float w, float h)
+        // In-game audio switches (bottom-left): the mute-all speaker (everything) and the
+        // background-music note (music loop only — gameplay music + SFX stay on). Drawn on
+        // every in-game phase so players can mute without leaving the round; mirror the
+        // nav/Settings controls via the shared helpers. They float alone over the dark
+        // arena/intro screens, so they use the solid-pink AudioButton.
+        private void DrawAudioToggles(float w, float h)
         {
-            var s = SaveService.Current?.settings;
-            if (s == null) return;
-            bool on = s.musicEnabled;
-            var r = new Rect(12f, h - 50f, 48f, 36f);
-            bool click = AudioButton(r, "🎵", on);
-            if (!on) DrawSlash(r.center, 30f, 6f, Red);
-            if (click) SetMusicEnabled(!on);
+            if (SaveService.Current?.settings == null) return;
+            DrawMuteAllButton(new Rect(12f, h - 50f, 48f, 36f));
+            DrawMusicButton(new Rect(70f, h - 50f, 48f, 36f));
         }
 
         // Draw a wrapped paragraph and return the y just below it.
@@ -1639,8 +1708,10 @@ namespace Eliminated.Game.UI
             float faceW = thumb.FaceRect.width * fit.width;
             float eyeGap = Mathf.Max(1f, Mathf.Abs(R.x - L.x));
             // lens radius: cover the eye (with a floor so tiny-eyed faces still get real glasses),
-            // but never so large the two rims collide into a figure-8.
-            float sr = Mathf.Max(eyeRad * faceW * 1.3f, faceW * 0.26f);
+            // but never so large the two rims collide into a figure-8. The floor is tied to the eye
+            // SPACING, not the whole face box — a face box much wider than the eyes (the frog wizard's
+            // small, wide-set eyes) otherwise forces lenses ~3× the eye that swallow the face.
+            float sr = Mathf.Max(eyeRad * faceW * 1.3f, eyeGap * 0.20f);
             sr = Mathf.Min(sr, faceW * 0.42f);    // never dominate the face (keeps the clown's big eyes in check)
             sr = Mathf.Min(sr, eyeGap * 0.47f);   // lenses just touch at most — no overlap, so the rims can't cross into a second "bridge"
             sr = Mathf.Max(sr, 4f);
@@ -2051,7 +2122,7 @@ namespace Eliminated.Game.UI
                 new GUIStyle(_body) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = Ink } });
             Lbl(new Rect(20, 44, 336, 22), Loc.Get("hud.players_alive", alive), _body);
 
-            DrawYourNumber(snap);
+            DrawYourNumber(snap, w, h);
             DrawActivePowerups(snap);
 
             if (!_router.HasSeries) return;
@@ -2064,23 +2135,31 @@ namespace Eliminated.Game.UI
 
         // Your assigned tag, kept in front of you: it's the number floating over your
         // head and the one the announcer calls when you're eliminated ("Player N has
-        // been eliminated."). Solo only — co-op has several locals, whose tags the
-        // overhead labels cover instead.
-        private void DrawYourNumber(Snapshot snap)
+        // been eliminated."). A bold gold pill at BOTTOM-CENTER so your identity reads
+        // near where your eyes sit during play — parked just ABOVE the transient caption
+        // band (h-80) and the controls hint (h-36) so it never fights either; the few
+        // games with bottom-centre controls (RPS/Simon) draw their panels on top. Solo
+        // only — co-op has several locals, whose overhead tags cover that instead.
+        private void DrawYourNumber(Snapshot snap, float w, float h)
         {
             var locals = _router.LocalPlayerIds;
             if (locals == null || locals.Count != 1 || snap?.Actors == null) return;
             int myNum = NumberInSnap(snap, locals[0]);
             if (myNum <= 0) return;
-            GUI.Box(new Rect(10, 80, 150, 32), "");
-            Lbl(new Rect(20, 84, 130, 24), Loc.Get("hud.you_are", myNum),
-                new GUIStyle(_body) { fontSize = 16, fontStyle = FontStyle.Bold, normal = { textColor = Yellow } });
+
+            string text = Loc.Get("hud.you_are", myNum);
+            var style = new GUIStyle(_body) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = Yellow } };
+            float pw = Mathf.Max(150f, style.CalcSize(new GUIContent(text)).x + 36f), ph = 30f;
+            var r = new Rect((w - pw) * 0.5f, h - 112f, pw, ph);
+            Fill(r, Alpha(Color.black, 0.55f), ph * 0.5f);
+            Stroke(r, Alpha(Yellow, 0.55f), 1.5f, ph * 0.5f);
+            Lbl(r, text, style);
         }
 
-        private GUIStyle _puIcon;
+        private GUIStyle _puPill;
 
         // Boomerang-Fu-style active-effect strip: the powerups you're carrying right
-        // now, as icon chips under your tag, so it's always clear what you've got.
+        // now, as a NAMED list down the top-left, so it's always clear what you've got.
         // BLESSINGS show a steady green bar (they stay with you); CURSES show a
         // draining red bar so you can see exactly when the affliction wears off.
         // Reads the local player's live status straight off the snapshot.
@@ -2097,7 +2176,7 @@ namespace Eliminated.Game.UI
             foreach (var a in snap.Actors) if (a.Id == myId) { me = a; break; }
             if (me == null || !me.Alive) return;
 
-            var fx = new List<(string icon, float frac, bool held)>();
+            var fx = new List<(string icon, string label, float frac, bool held)>();
             // Shared blessings (held) + curses (draining).
             AddHeld(fx, me.Shield, "Shield");
             AddHeld(fx, me.PuSpeedT > 0f, "Speed");
@@ -2121,29 +2200,37 @@ namespace Eliminated.Game.UI
             }
             if (fx.Count == 0) return;
 
-            if (_puIcon == null)
-                _puIcon = new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter, fontSize = 22, fontStyle = FontStyle.Bold, wordWrap = false, normal = { textColor = Ink } };
+            if (_puPill == null)
+                _puPill = new GUIStyle(_body) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, wordWrap = false };
 
-            const float sz = 42f, gap = 6f;
-            float x = 14f, y = 118f;
-            var curse = new Color(1f, 0.40f, 0.42f);
+            // A vertical list down the top-left, under the round box. Each row names the
+            // powerup in green (a blessing you keep) or red (a curse that's draining),
+            // with a matching status bar — so it reads even if the emoji glyph doesn't.
+            float x = 12f, y = 82f;
+            var good = new Color(0.55f, 0.92f, 0.70f);
+            var curse = new Color(1f, 0.50f, 0.52f);
+            const float ph = 24f;
             foreach (var e in fx)
             {
-                var box = new Rect(x, y, sz, sz);
-                Fill(box, new Color(0f, 0f, 0f, 0.55f), 9f);
-                Lbl(new Rect(box.x, box.y - 1f, sz, sz - 5f), e.icon, _puIcon);
-                var track = new Rect(box.x + 5f, box.yMax - 8f, sz - 10f, 4f);
-                Fill(track, new Color(1f, 1f, 1f, 0.16f), 2f);
-                Fill(new Rect(track.x, track.y, track.width * e.frac, track.height), e.held ? Green : curse, 2f);
-                x += sz + gap;
+                Color c = e.held ? good : curse;
+                string text = string.IsNullOrEmpty(e.icon) ? e.label : e.icon + "  " + e.label;
+                float pw = Mathf.Max(96f, _puPill.CalcSize(new GUIContent(text)).x + 18f);
+                var box = new Rect(x, y, pw, ph);
+                Fill(box, new Color(0f, 0f, 0f, 0.62f), 7f);
+                var st = new GUIStyle(_puPill) { normal = { textColor = c } };
+                Lbl(new Rect(box.x + 8f, box.y, pw - 12f, ph - 3f), text, st);
+                var track = new Rect(box.x + 6f, box.yMax - 4f, pw - 12f, 2.5f);
+                Fill(track, new Color(1f, 1f, 1f, 0.14f), 1.25f);
+                Fill(new Rect(track.x, track.y, track.width * Mathf.Clamp01(e.frac), track.height), c, 1.25f);
+                y += ph + 5f;
             }
         }
 
-        private static void AddHeld(List<(string icon, float frac, bool held)> fx, bool on, string key)
-        { if (on && PowerupCatalog.TryGet(key, out var m)) fx.Add((m.Icon, 1f, true)); }
+        private static void AddHeld(List<(string icon, string label, float frac, bool held)> fx, bool on, string key)
+        { if (on && PowerupCatalog.TryGet(key, out var m)) fx.Add((m.Icon, m.Label, 1f, true)); }
 
-        private static void AddTimed(List<(string icon, float frac, bool held)> fx, float t, float max, string key)
-        { if (t > 0f && PowerupCatalog.TryGet(key, out var m)) fx.Add((m.Icon, Mathf.Clamp01(t / max), false)); }
+        private static void AddTimed(List<(string icon, string label, float frac, bool held)> fx, float t, float max, string key)
+        { if (t > 0f && PowerupCatalog.TryGet(key, out var m)) fx.Add((m.Icon, m.Label, Mathf.Clamp01(t / max), false)); }
 
         private void DrawControlsHint(GameId? game, float w, float h)
         {
@@ -2170,7 +2257,7 @@ namespace Eliminated.Game.UI
                     case GameId.PresentSwap: hint = Loc.Get("hud.hint_present"); break;
                 }
             }
-            Lbl(new Rect(0, h - 36, w, 24), hint, new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
+            Lbl(new Rect(0, h - 46, w, 26), hint, new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter });
         }
 
         private void DrawGameSpecific(Snapshot snap, float w, float h)
@@ -2381,7 +2468,7 @@ namespace Eliminated.Game.UI
                         string[] opts = { "R", "P", "S" };
                         string[] lbl = { "ROCK", "PAPER", "SCISSORS" };
                         Color[] cols = { Teal, Green, Pink }; // distinct per throw so they don't blur together
-                        float bx = w / 2f - 192f, by = h - 150f;
+                        float bx = w / 2f - 192f, by = h - 210f; // raised so the instruction pill can't crop off the bottom
 
                         // Instruction + a BIG countdown sit right above the buttons (the top-right
                         // clock was too far from the action — you couldn't tell how long you had).
@@ -2894,14 +2981,35 @@ namespace Eliminated.Game.UI
             var pr = new Rect(w * 0.5f - 330f, h * 0.18f, 660f, h * 0.62f);
             Fill(pr, Panel, 22f);
             Stroke(pr, Line, 2f, 22f);
-            float y = h * 0.22f;
+
+            // Who am I? Highlight the local player's row + show every player's JERSEY number
+            // (the "#N" identity the announcer calls), so between games you can find yourself
+            // and see how your tag placed — matches the series-result screen's number badge.
+            var locals = _router.LocalPlayerIds;
+            string meId = (locals != null && locals.Count == 1) ? locals[0] : null;
+
+            float rowX = w * 0.5f - 300f, rowW = 600f, y = h * 0.22f;
+            var badgeStyle = new GUIStyle(_body) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.086f, 0.125f, 0.114f) } };
+            var jerseyBg = new Color(0.96f, 0.97f, 0.96f, 0.92f);
             foreach (var e in report.Entries)
             {
-                string nm = Name(e.PlayerId);
+                bool mine = meId != null && e.PlayerId == meId;
+                if (mine) Fill(new Rect(rowX - 8f, y - 2f, rowW + 16f, 26f), Alpha(Yellow, 0.12f), 7f);
+
+                Lbl(new Rect(rowX, y, 40f, 24f), $"#{e.Placement}",
+                    new GUIStyle(_body) { fontStyle = FontStyle.Bold, normal = { textColor = mine ? Yellow : Ink } });
+
+                int num = _router.NumberOf(e.PlayerId);
+                var badge = new Rect(rowX + 42f, y + 2f, 44f, 18f);
+                Fill(badge, jerseyBg, 6f);
+                Lbl(badge, num > 0 ? num.ToString("000") : "—", badgeStyle);
+
+                string nm = Name(e.PlayerId) + (mine ? "  " + Loc.Get("res.you") : "");
                 string tag = e.Survived ? Loc.Get("res.safe") : Loc.Get("res.out");
                 string note = string.IsNullOrEmpty(e.Note) ? "" : $"  — {e.Note}";
-                Lbl(new Rect(w * 0.5f - 280, y, 560, 24),
-                    $"#{e.Placement}  {nm}   [{tag}]   ◍ {e.MarblesEarned}{note}", _body);
+                Lbl(new Rect(rowX + 96f, y, rowW - 96f, 24f),
+                    $"{nm}   [{tag}]   ◍ {e.MarblesEarned}{note}",
+                    new GUIStyle(_body) { fontStyle = mine ? FontStyle.Bold : FontStyle.Normal, normal = { textColor = mine ? Yellow : Ink } });
                 y += 26;
             }
         }
@@ -2910,24 +3018,66 @@ namespace Eliminated.Game.UI
         {
             Fill(new Rect(0, 0, w, h), Alpha(Bg0, 0.6f), 0f);
             var sr = _router.SeriesResult;
-            Lbl(new Rect(0, h * 0.10f, w, 50), Loc.Get("ui.series_over"), _h1);
-            var pr = new Rect(w * 0.5f - 330f, h * 0.20f, 660f, h * 0.52f);
+            Lbl(new Rect(0, h * 0.08f, w, 50), Loc.Get("ui.series_over"), _h1);
+
+            // Panel that holds the standings. Rows are laid out *relative to this
+            // rect* (not absolute screen fractions) so a full 12-player field always
+            // fits inside the green panel instead of spilling past the bottom edge.
+            var pr = new Rect(w * 0.5f - 340f, h * 0.16f, 680f, h * 0.58f);
             Fill(pr, Panel, 22f);
             Stroke(pr, Line, 2f, 22f);
-            if (sr != null)
+
+            if (sr != null && sr.Standings.Count > 0)
             {
-                float y = h * 0.24f;
-                foreach (var st in sr.Standings)
+                const float pad = 18f;
+                var inner = new Rect(pr.x + pad, pr.y + pad, pr.width - pad * 2f, pr.height - pad * 2f);
+                int n = sr.Standings.Count;
+                float rowH = Mathf.Clamp(inner.height / n, 20f, 30f);
+                float startY = inner.y + Mathf.Max(0f, (inner.height - rowH * n) * 0.5f); // vertically centered
+                int fs = Mathf.Clamp((int)(rowH - 12f), 11, 16);
+
+                // Columns: rank | jersey badge | name | title (dim) | marbles (right).
+                const float rankW = 38f, jerseyW = 52f, marW = 82f, titleW = 192f, gap = 8f;
+                float rankX = inner.x;
+                float jerseyX = rankX + rankW;
+                float nameX = jerseyX + jerseyW + gap;
+                float marX = inner.xMax - marW;
+                float titleX = marX - titleW - gap;
+                float nameW = titleX - nameX - gap;
+
+                var rankStyle = new GUIStyle(_body) { fontSize = fs, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft, normal = { textColor = InkDim } };
+                var champRank = new GUIStyle(rankStyle) { normal = { textColor = Yellow } };
+                var nameStyle = new GUIStyle(_body) { fontSize = fs, alignment = TextAnchor.MiddleLeft, normal = { textColor = Ink } };
+                var champName = new GUIStyle(nameStyle) { fontStyle = FontStyle.Bold, normal = { textColor = Yellow } };
+                var titleStyle = new GUIStyle(_body) { fontSize = Mathf.Max(10, fs - 3), alignment = TextAnchor.MiddleRight, normal = { textColor = InkDim } };
+                var marStyle = new GUIStyle(_body) { fontSize = fs, alignment = TextAnchor.MiddleRight, normal = { textColor = Teal } };
+                var badgeStyle = new GUIStyle(_body) { fontSize = Mathf.Max(10, fs - 3), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.086f, 0.125f, 0.114f) } };
+                var jerseyBg = new Color(0.96f, 0.97f, 0.96f, 0.92f);
+
+                for (int i = 0; i < n; i++)
                 {
-                    Lbl(new Rect(w * 0.5f - 290, y, 580, 24),
-                        $"#{st.Placement}  {Name(st.PlayerId)}   “{st.Title}”   ◍ {st.Marbles}", _body);
-                    y += 26;
+                    var st = sr.Standings[i];
+                    float ry = startY + i * rowH;
+                    bool champ = st.Placement == 1;
+                    if (champ) Fill(new Rect(inner.x - 4f, ry, inner.width + 8f, rowH), Alpha(Yellow, 0.10f), 7f);
+
+                    Lbl(new Rect(rankX, ry, rankW, rowH), $"#{st.Placement}", champ ? champRank : rankStyle);
+
+                    int num = _router.NumberOf(st.PlayerId);
+                    var badge = new Rect(jerseyX, ry + (rowH - 18f) * 0.5f, jerseyW - gap, 18f);
+                    Fill(badge, jerseyBg, 6f);
+                    Lbl(badge, num > 0 ? num.ToString("000") : "—", badgeStyle);
+
+                    Lbl(new Rect(nameX, ry, nameW, rowH), Name(st.PlayerId), champ ? champName : nameStyle);
+                    Lbl(new Rect(titleX, ry, titleW, rowH), $"“{st.Title}”", titleStyle);
+                    Lbl(new Rect(marX, ry, marW, rowH), $"◍ {st.Marbles}", marStyle);
                 }
             }
+
             float bw = 320;
             if (Btn(new Rect((w - bw) / 2f, h * 0.80f, bw, 52f), Loc.Get("ui.back_to_menu"), Pink, OnDark))
             {
-                if (_router.Active == _net) CloseOnline();
+                if (ReferenceEquals(_router.Active, _net)) CloseOnline();
                 else _sim.EndSeries();
                 _lastPhase = RoomPhase.Lobby;
             }

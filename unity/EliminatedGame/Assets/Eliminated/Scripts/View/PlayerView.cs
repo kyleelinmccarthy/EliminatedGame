@@ -216,7 +216,9 @@ namespace Eliminated.Game.View
                     ? LogicalSpace.ToWorld(overrideLogical.Value.x, overrideLogical.Value.y)
                     : LogicalSpace.ToWorld(a.Pos);
                 Root.transform.rotation = Quaternion.identity;
-                float r = LogicalSpace.WorldRadius(a.Radius > 0f ? a.Radius : 26f);
+                // A coffin is a coffin — always standard size, never the powerup scale
+                // the player happened to die at (a Shrunk player shouldn't get a doll coffin).
+                float r = LogicalSpace.WorldRadius(26f); // 26 = Constants.PlayerRadius
                 _coffin.transform.localScale = Vector3.one * (r / 0.52f); // 0.52 = WorldRadius(26)
             }
             _coffinAge += dt;
@@ -414,7 +416,9 @@ namespace Eliminated.Game.View
 
             float pop = SpawnPop(_age);
             float bob = 1f + 0.03f * Mathf.Sin((Time.time + _phase) * 3.2f);
-            float k = _artScale * pop;
+            // _artScale is fixed at bind time (for Scale==1); fold in the LIVE powerup
+            // scale so Shrink/Embiggen actually resize the sprite, not just the hitbox.
+            float k = _artScale * pop * (a.Scale > 0f ? a.Scale : 1f);
             _art.transform.localScale = new Vector3(k * _faceSign, k * bob, k);
             _art.transform.localPosition = new Vector3(0f, -_artFootY * k, 0f);
 

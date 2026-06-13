@@ -34,5 +34,9 @@ namespace Eliminated.Game.Net
         RoundReport LastRoundReport { get; }
         SeriesResult SeriesResult { get; }
         string NameOf(string playerId);
+        /// <summary>The player's jersey/roster number (the "#N" identity, not a placement),
+        /// resolved from the room roster. 0 if unknown. Used by results screens so a player
+        /// can find their own row between games.</summary>
+        int NumberOf(string playerId);
     }
 }

@@ -24,6 +24,17 @@ namespace Eliminated.Tools.VoiceGen
         private const int MaleRate = 134, MalePitch = 32;     // wpm, 0..99 — slow, ceremonial PA
         private const int FemaleRate = 158, FemalePitch = 55;
 
+        // Optional NEURAL engine (Piper). When PIPER_BIN + PIPER_MALE + PIPER_FEMALE point at
+        // a Piper binary and two .onnx voices, the bank is rendered with Piper — natural,
+        // near-web quality — instead of espeak-ng's robotic formant synth. espeak stays the
+        // fallback when those vars are unset. Build-time only; the game just plays the WAVs.
+        // Ship-safe voices only: pick CC0 / public-domain models (en_US-joe = CC0, en_US-norman
+        // = public domain; en_US-kristin / en_US-ljspeech = public domain) — NOT the CC BY-NC
+        // ones (ryan/hfc/lessac) which can't ship commercially.
+        private static string PiperBin, PiperMale, PiperFemale;
+        private static bool PiperReady =>
+            !string.IsNullOrEmpty(PiperBin) && File.Exists(PiperMale ?? "") && File.Exists(PiperFemale ?? "");
+
         private enum V { Male, Female }
 
         public static int Main(string[] args)
@@ -33,11 +44,17 @@ namespace Eliminated.Tools.VoiceGen
                 : Path.Combine("..", "..", "unity", "EliminatedGame", "Assets", "Eliminated", "Resources", "Audio", "voice");
             Directory.CreateDirectory(outDir);
 
-            if (!EspeakAvailable())
+            PiperBin = Environment.GetEnvironmentVariable("PIPER_BIN");
+            PiperMale = Environment.GetEnvironmentVariable("PIPER_MALE");
+            PiperFemale = Environment.GetEnvironmentVariable("PIPER_FEMALE");
+            bool piper = PiperReady;
+            if (piper)
+                Console.WriteLine($"Rendering with PIPER (neural):\n  male   = {PiperMale}\n  female = {PiperFemale}");
+            else if (!EspeakAvailable())
             {
                 Console.Error.WriteLine(
-                    "espeak-ng not found on PATH. Install it (e.g. `apt install espeak-ng`, `brew install espeak-ng`) " +
-                    "and re-run. This is a build-time tool only; the shipped game just plays the generated WAVs.");
+                    "No TTS engine: set PIPER_BIN/PIPER_MALE/PIPER_FEMALE for neural Piper, or install espeak-ng " +
+                    "(`apt install espeak-ng`). Build-time only; the shipped game just plays the generated WAVs.");
                 return 1;
             }
 
@@ -136,24 +153,17 @@ namespace Eliminated.Tools.VoiceGen
             list.Add(new Spec("elim_player", "Player eliminated.", V.Female));
             list.Add(new Spec("elim_players", "Players eliminated.", V.Female));
 
-            // --- Female voice: per-player elimination, by lobby number --------------
-            // "Player <N> has been eliminated." is stitched at runtime (Announcer.cs)
-            // from these word clips, so any tag 1..456 can be called out without baking
-            // a whole phrase for every number. Number words are rendered bare (no full
-            // stop) so they flow mid-sentence; the closing "has been eliminated." carries
-            // the falling intonation. Ones reuse the array above (1..19); tens + hundred
-            // compose the rest (e.g. 387 → "three" "hundred" "eighty" "seven").
-            string[] tens = { "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety" };
+            // --- Female voice: per-player elimination, read DIGIT BY DIGIT ----------
+            // Player tags are spoken Squid-Game style — "Player five seven three has been
+            // eliminated." — stitched at runtime (Announcer.cs) from ten digit clips, so any
+            // tag works and the call stays short. Bare words (no full stop) so they flow;
+            // "has been eliminated." carries the close. Plural form for a same-tick wipe:
+            // "Players five seven three, one two … have been eliminated."
             list.Add(new Spec("num_player", "Player", V.Female));
-            for (int n = 1; n <= 19; n++)
-                list.Add(new Spec($"num_{n}", ones[n], V.Female));
-            for (int t = 2; t <= 9; t++)
-                list.Add(new Spec($"num_{t * 10}", tens[t], V.Female));
-            list.Add(new Spec("num_hundred", "hundred", V.Female));
-            list.Add(new Spec("num_elim", "has been eliminated.", V.Female));
-            // Plural form, for a same-tick wipe enumerated by number:
-            // "Players 1, 2, 3, 4 … have been eliminated."
             list.Add(new Spec("num_players", "Players", V.Female));
+            for (int d = 0; d <= 9; d++)
+                list.Add(new Spec($"num_{d}", ones[d], V.Female)); // ones[0..9] = "zero".."nine"
+            list.Add(new Spec("num_elim", "has been eliminated.", V.Female));
             list.Add(new Spec("num_elim_plural", "have been eliminated.", V.Female));
 
             return list;
@@ -171,7 +181,52 @@ namespace Eliminated.Tools.VoiceGen
             catch { return false; }
         }
 
+        // Render one clip with whichever engine is configured, then run the shared
+        // post-processing (trim → normalize → fade) so playback is gapless and even.
         private static bool Render(V voice, string text, string outPath, out string err)
+            => PiperReady ? RenderPiper(voice, text, outPath, out err)
+                          : RenderEspeak(voice, text, outPath, out err);
+
+        // Neural Piper: text on stdin, WAV to --output_file. The binary needs its bundled
+        // libs + espeak-ng-data alongside it (run with LD_LIBRARY_PATH set to that dir).
+        private static bool RenderPiper(V voice, string text, string outPath, out string err)
+        {
+            err = null;
+            string tmp = Path.GetTempFileName();
+            try
+            {
+                string model = voice == V.Male ? PiperMale : PiperFemale;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = PiperBin,
+                    RedirectStandardInput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+                psi.ArgumentList.Add("--model"); psi.ArgumentList.Add(model);
+                psi.ArgumentList.Add("--output_file"); psi.ArgumentList.Add(tmp);
+                using (var p = Process.Start(psi))
+                {
+                    p.StandardInput.Write(text);
+                    p.StandardInput.Close();
+                    string se = p.StandardError.ReadToEnd();
+                    p.WaitForExit();
+                    if (p.ExitCode != 0) { err = $"piper exit {p.ExitCode}: {se}"; return false; }
+                }
+                var (samples, rateHz) = ReadWavMono(tmp);
+                if (samples.Length == 0) { err = "piper produced empty audio"; return false; }
+                samples = TrimSilence(samples, 0.02f, (int)(0.035f * rateHz), (int)(0.06f * rateHz));
+                Normalize(samples, 0.92f);
+                FadeEdges(samples, (int)(0.006f * rateHz));
+                WriteWavMono(outPath, samples, rateHz);
+                return true;
+            }
+            catch (Exception ex) { err = ex.Message; return false; }
+            finally { TryDelete(tmp); }
+        }
+
+        private static bool RenderEspeak(V voice, string text, string outPath, out string err)
         {
             err = null;
             string tmp = Path.GetTempFileName();
@@ -336,11 +391,26 @@ namespace Eliminated.Tools.VoiceGen
             using var sw = new StreamWriter(Path.Combine(dir, "VOICE_MANIFEST.md"));
             sw.WriteLine("# Game Master announcer voice bank");
             sw.WriteLine();
-            sw.WriteLine("Robotic PA voicelines rendered offline with **espeak-ng** (a build-time tool,");
-            sw.WriteLine("not a runtime/Unity dependency). The game plays/queues these WAVs at runtime");
-            sw.WriteLine("(see `Scripts/Audio/Announcer.cs`), mirroring the web build's browser-TTS Game");
-            sw.WriteLine("Master. Speech-synth output is data, not a derivative of the synthesizer, so no");
-            sw.WriteLine("license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>`.");
+            if (PiperReady)
+            {
+                sw.WriteLine("Announcer voicelines rendered offline with **Piper** (neural TTS, a build-time");
+                sw.WriteLine("tool — not a runtime/Unity dependency), for natural near-web quality. The game");
+                sw.WriteLine("plays/queues these WAVs at runtime (see `Scripts/Audio/Announcer.cs`).");
+                sw.WriteLine();
+                sw.WriteLine($"- male announcer  : `{Path.GetFileName(PiperMale)}`");
+                sw.WriteLine($"- female announcer: `{Path.GetFileName(PiperFemale)}`");
+                sw.WriteLine("- **Ship only CC0 / public-domain voices** (e.g. en_US-joe = CC0, en_US-kristin =");
+                sw.WriteLine("  public domain). Record the chosen voices + licenses in `docs/ASSET_SOURCES.md`.");
+                sw.WriteLine("  Re-run: `PIPER_BIN=… PIPER_MALE=… PIPER_FEMALE=… dotnet run --project tools/VoiceGen -- <dir>`.");
+            }
+            else
+            {
+                sw.WriteLine("Robotic PA voicelines rendered offline with **espeak-ng** (a build-time tool,");
+                sw.WriteLine("not a runtime/Unity dependency). The game plays/queues these WAVs at runtime");
+                sw.WriteLine("(see `Scripts/Audio/Announcer.cs`), mirroring the web build's browser-TTS Game");
+                sw.WriteLine("Master. Speech-synth output is data, not a derivative of the synthesizer, so no");
+                sw.WriteLine("license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>`.");
+            }
             sw.WriteLine();
             sw.WriteLine("16-bit PCM mono WAV. **M** = male announcer (game reveals + Simon Says), **F** = female (eliminations).");
             sw.WriteLine();

@@ -21,8 +21,6 @@ namespace Eliminated.Game.View
             { "rogue", "ninja" },     // Sayonara  — Jovial Cute Characters (ninja, hooded)
             { "sorcerer", "wizard" }, // Hexecutioner   — Jovial Cute Characters (wizard)
             { "clown", "clown" },     // Last Laugh     — Jovial Cute Characters (clown)
-            // "wizard" (Hocus Croakus) is a FROG wizard — no frog art in these packs
-            // yet, so it stays on the player rather than borrow the human wizard.
 
             // --- MiMU animal pack, assembled by AnimalPrefabBuilder (Tools ▸
             // Eliminated ▸ Build Animal Prefabs). Until that menu item is run these
@@ -37,12 +35,22 @@ namespace Eliminated.Game.View
             { "cow", "cow" }, { "owl", "owl" }, { "snowowl", "snowowl" },
             { "demon", "demon" }, { "devil", "devil" }, { "sheep", "sheep" },
 
-            // The food/fruit/veg roster (avo, egg, donut, berry, nana, …) and the
-            // remaining animal placeholders (bunny, pig, mouse, hamster, ghost) are
-            // intentionally NOT mapped. They have no bespoke art yet, so they stay
-            // hidden from the picker (DrawPlayerGrid only shows ids with art) rather than
-            // borrow an unrelated animal/player model. Add a real prefab + an entry here
-            // once that character's own art exists — do NOT alias them onto a critter.
+            // --- Our own generated kawaii sprites (tools/ArtGen/gen_chars.py →
+            // Art/Chars/*.png, prefabs assembled by GeneratedCharPrefabBuilder).
+            // Single-sprite blob-with-a-face characters, same shape as the slime.
+            // Prefab name == id except the frog wizard ("wizard" is the Jovial
+            // HUMAN wizard prefab, owned by sorcerer above). ---
+            { "wizard", "frogwizard" }, // Hocus Croakus — frog in a wizard hat
+            // food / fruit / veg
+            { "avo", "avo" }, { "egg", "egg" }, { "egg2", "egg2" }, { "goldegg", "goldegg" },
+            { "berry", "berry" }, { "brocc", "brocc" }, { "donut", "donut" }, { "pickle", "pickle" },
+            { "tomato", "tomato" }, { "pine", "pine" }, { "shroom", "shroom" }, { "sushi", "sushi" },
+            { "nana", "nana" }, { "plum", "plum" }, { "orange", "orange" }, { "blueberry", "blueberry" },
+            { "carrot", "carrot" }, { "dragonfruit", "dragonfruit" }, { "melon", "melon" },
+            { "onigiri", "onigiri" }, { "ghostpepper", "ghostpepper" }, { "cosmic", "cosmic" },
+            // remaining critters
+            { "bunny", "bunny" }, { "pig", "pig" }, { "mouse", "mouse" },
+            { "hamster", "hamster" }, { "ghost", "ghost" },
         };
 
         private static readonly Dictionary<string, GameObject> _cache = new Dictionary<string, GameObject>();
@@ -107,7 +115,7 @@ namespace Eliminated.Game.View
             bool Dark(int x, int y) { var p = all[y * tw + x]; return p.a > 128 && p.r < 85 && p.g < 85 && p.b < 85; }
             int yLo = ry + Mathf.RoundToInt(rh * 0.28f); // eyes are in the upper part (above the nose/mouth)
             var seen = new bool[rw * rh];
-            var blobs = new List<(int area, float cx, float cy, float rad)>();
+            var blobs = new List<(int area, float cx, float cy, float rad, float fill)>();
             var stack = new Stack<int>();
             for (int sy0 = yLo; sy0 < ry + rh; sy0++)
                 for (int sx0 = rx; sx0 < rx + rw; sx0++)
@@ -131,14 +139,25 @@ namespace Eliminated.Game.View
                             seen[idx] = true; stack.Push(nx | (ny << 16));
                         }
                     }
-                    // radius from the blob's full extent — robust for ring-shaped eyes (the owl's)
-                    if (area > 25) blobs.Add((area, (float)(ax / area), (float)(ay / area), 0.5f * Mathf.Max(mxx - mnx + 1, mxy - mny + 1)));
+                    // radius from the blob's full extent — robust for ring-shaped eyes (the owl's).
+                    // fill = area / bbox: round pupils ≈0.6, ring eyes ≈0.3-0.5, thin outline arcs ≈0.15.
+                    if (area > 25)
+                    {
+                        int bw = mxx - mnx + 1, bh = mxy - mny + 1;
+                        blobs.Add((area, (float)(ax / area), (float)(ay / area), 0.5f * Mathf.Max(bw, bh), area / (float)(bw * bh)));
+                    }
                 }
             if (blobs.Count < 2) return null;
-            blobs.Sort((a, b) => b.area.CompareTo(a.area));
-            int take = Mathf.Min(5, blobs.Count);
-            var l = blobs[0]; var r = blobs[0];
-            for (int i = 0; i < take; i++) { if (blobs[i].cx < l.cx) l = blobs[i]; if (blobs[i].cx > r.cx) r = blobs[i]; }
+            // A hat (the frog wizard's) splits the dark body OUTLINE into two large, low-fill
+            // C-shaped arcs near the cheeks that out-span the real eyes. Drop those arcs and keep
+            // filled pupils (and round ring eyes); fall back to all blobs if too few survive so
+            // hatless / ring-eyed faces (the owl) are never starved.
+            var eyes = blobs.FindAll(b => b.fill >= 0.30f);
+            if (eyes.Count < 2) eyes = blobs;
+            eyes.Sort((a, b) => b.area.CompareTo(a.area));
+            int take = Mathf.Min(5, eyes.Count);
+            var l = eyes[0]; var r = eyes[0];
+            for (int i = 0; i < take; i++) { if (eyes[i].cx < l.cx) l = eyes[i]; if (eyes[i].cx > r.cx) r = eyes[i]; }
             float radPx = 0.5f * (l.rad + r.rad);
             Vector2 eL2 = new Vector2((l.cx - rx) / rw, (l.cy - ry) / rh);
             Vector2 eR2 = new Vector2((r.cx - rx) / rw, (r.cy - ry) / rh);

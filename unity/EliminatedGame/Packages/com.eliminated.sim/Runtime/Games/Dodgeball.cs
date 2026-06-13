@@ -233,7 +233,7 @@ namespace Eliminated.Sim.Games
                 if (held != null) DropBall(held);
                 a.Carrying = null;
             }
-            Eliminate(a, "Pegged out!");
+            Eliminate(a, "Knocked out by a ball!");
         }
 
         private Actor NearestEnemy(Actor a)

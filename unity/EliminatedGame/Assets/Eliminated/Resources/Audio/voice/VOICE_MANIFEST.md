@@ -1,10 +1,14 @@
 # Game Master announcer voice bank
 
-Robotic PA voicelines rendered offline with **espeak-ng** (a build-time tool,
-not a runtime/Unity dependency). The game plays/queues these WAVs at runtime
-(see `Scripts/Audio/Announcer.cs`), mirroring the web build's browser-TTS Game
-Master. Speech-synth output is data, not a derivative of the synthesizer, so no
-license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>`.
+Announcer voicelines rendered offline with **Piper** (neural TTS, a build-time
+tool — not a runtime/Unity dependency), for natural near-web quality. The game
+plays/queues these WAVs at runtime (see `Scripts/Audio/Announcer.cs`).
+
+- male announcer  : `en_US-joe-medium.onnx`
+- female announcer: `en_US-ljspeech-medium.onnx`
+- **Ship only CC0 / public-domain voices** (e.g. en_US-joe = CC0, en_US-kristin =
+  public domain). Record the chosen voices + licenses in `docs/ASSET_SOURCES.md`.
+  Re-run: `PIPER_BIN=… PIPER_MALE=… PIPER_FEMALE=… dotnet run --project tools/VoiceGen -- <dir>`.
 
 16-bit PCM mono WAV. **M** = male announcer (game reveals + Simon Says), **F** = female (eliminations).
 
@@ -62,6 +66,8 @@ license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>
 - `elim_player.wav` — [F] “Player eliminated.”
 - `elim_players.wav` — [F] “Players eliminated.”
 - `num_player.wav` — [F] “Player”
+- `num_players.wav` — [F] “Players”
+- `num_0.wav` — [F] “zero”
 - `num_1.wav` — [F] “one”
 - `num_2.wav` — [F] “two”
 - `num_3.wav` — [F] “three”
@@ -71,25 +77,5 @@ license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>
 - `num_7.wav` — [F] “seven”
 - `num_8.wav` — [F] “eight”
 - `num_9.wav` — [F] “nine”
-- `num_10.wav` — [F] “ten”
-- `num_11.wav` — [F] “eleven”
-- `num_12.wav` — [F] “twelve”
-- `num_13.wav` — [F] “thirteen”
-- `num_14.wav` — [F] “fourteen”
-- `num_15.wav` — [F] “fifteen”
-- `num_16.wav` — [F] “sixteen”
-- `num_17.wav` — [F] “seventeen”
-- `num_18.wav` — [F] “eighteen”
-- `num_19.wav` — [F] “nineteen”
-- `num_20.wav` — [F] “twenty”
-- `num_30.wav` — [F] “thirty”
-- `num_40.wav` — [F] “forty”
-- `num_50.wav` — [F] “fifty”
-- `num_60.wav` — [F] “sixty”
-- `num_70.wav` — [F] “seventy”
-- `num_80.wav` — [F] “eighty”
-- `num_90.wav` — [F] “ninety”
-- `num_hundred.wav` — [F] “hundred”
 - `num_elim.wav` — [F] “has been eliminated.”
-- `num_players.wav` — [F] “Players”
 - `num_elim_plural.wav` — [F] “have been eliminated.”

@@ -21,10 +21,17 @@ namespace Eliminated.Sim.Games
         public static readonly float PlatformX = Constants.ArenaW / 2f;
         public static readonly float PlatformY = Constants.ArenaH / 2f;
         public const float PlatformR = 112f;
-        private const int RoomCount = 6;
-        private const float RingRadius = 252f;
-        private const float RoomRadius = 84f;
+        private const int RoomCount = 4;        // one per CORNER — with 12 players a small call can't save all
+        private const float RoomRadius = 92f;
         private const float WanderTime = 4.5f;
+        private const float SpinRate = 0.7f;    // platform (and the riders on it) angular speed, rad/s
+
+        // The four corner "safe" rooms, set well out from the central platform so the scramble is a
+        // real sprint and a small called number leaves players stranded.
+        private static readonly (float x, float y)[] CornerRooms =
+        {
+            (245f, 168f), (1035f, 168f), (245f, 552f), (1035f, 552f),
+        };
 
         private readonly List<Room> _rooms = new List<Room>();
         private MinglePhase _phase = MinglePhase.Wander;
@@ -50,10 +57,7 @@ namespace Eliminated.Sim.Games
             Elapsed = 0f;
             _startCount = Actors.Count;
             for (int i = 0; i < RoomCount; i++)
-            {
-                float ang = -(float)Math.PI / 2f + (i / (float)RoomCount) * 6.2831853f;
-                _rooms.Add(new Room { X = PlatformX + (float)Math.Cos(ang) * RingRadius, Y = PlatformY + (float)Math.Sin(ang) * RingRadius, R = RoomRadius });
-            }
+                _rooms.Add(new Room { X = CornerRooms[i].x, Y = CornerRooms[i].y, R = RoomRadius });
             GatherOnPlatform();
             _phase = MinglePhase.Wander;
             _timer = WanderTime;
@@ -71,6 +75,18 @@ namespace Eliminated.Sim.Games
                 alive[i].Pos = new Vec2(PlatformX + (float)Math.Cos(ang) * rad, PlatformY + (float)Math.Sin(ang) * rad);
                 alive[i].InDx = 0f; alive[i].InDy = 0f; alive[i].Vel = Vec2.Zero;
             }
+        }
+
+        // Ride the spinning carousel: keep the player's radius from the centre but rotate their
+        // angle by the platform's spin, so they travel WITH it (and stay on it). No free movement.
+        private void RideCarousel(Actor a, float dt)
+        {
+            float dx = a.Pos.X - PlatformX, dy = a.Pos.Y - PlatformY;
+            float rad = Math.Min((float)Math.Sqrt(dx * dx + dy * dy), PlatformR - Constants.PlayerRadius * a.Scale);
+            float ang = (float)Math.Atan2(dy, dx) + SpinRate * dt;
+            a.Pos = new Vec2(PlatformX + (float)Math.Cos(ang) * rad, PlatformY + (float)Math.Sin(ang) * rad);
+            a.InDx = 0f; a.InDy = 0f; a.Vel = Vec2.Zero;
+            a.Facing = ang + (float)Math.PI * 0.5f; // face the direction of travel
         }
 
         private void ConfineToPlatform(Actor a)
@@ -109,15 +125,23 @@ namespace Eliminated.Sim.Games
             if (_done) return;
             Elapsed += dt;
             _timer -= dt;
-            _spin += dt * 0.6f;
+            _spin += dt * SpinRate;
 
             foreach (var a in Actors)
             {
                 if (!a.Alive) continue;
                 UpdateStatus(a, dt);
-                if (a.IsBot) BotThink(a);
-                MoveActor(a, dt);
-                if (_phase == MinglePhase.Wander) ConfineToPlatform(a);
+                if (_phase == MinglePhase.Wander)
+                {
+                    // Music's playing: everyone simply RIDES the spinning platform (orbits the centre
+                    // with it) — no frantic darting. The scramble only starts when the number is called.
+                    RideCarousel(a, dt);
+                }
+                else
+                {
+                    if (a.IsBot) BotThink(a);
+                    MoveActor(a, dt);
+                }
             }
 
             if (_phase == MinglePhase.Wander) { if (_timer <= 0f) BeginMingle(); }

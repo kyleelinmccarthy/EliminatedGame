@@ -81,6 +81,27 @@ These are our own generated output (no third-party license). Real 3D player mode
 and richer arena props are sourced from the approved CC0 sites in Phase 7 and get
 rows in the ledger above.
 
+## Generated character sprites (shipped — our own output, no third-party license)
+
+The 28 roster characters with no Asset Store art — the food/fruit/veg gang
+(`avo, egg, egg2, goldegg, berry, brocc, donut, pickle, tomato, pine, shroom,
+sushi, nana, plum, orange, blueberry, carrot, dragonfruit, melon, onigiri,
+ghostpepper, cosmic`), the leftover critters (`bunny, pig, mouse, hamster,
+ghost`) and the frog wizard (`wizard` → `frogwizard`) — are produced by
+**`tools/ArtGen/gen_chars.py`** (stdlib-only Python, SDF-rasterized) as 256×256
+RGBA PNGs into `unity/EliminatedGame/Assets/Eliminated/Art/Chars/`, style-matched
+to the imported cute packs (rounded body, darker same-hue outline, big dark eyes,
+blush). In-Editor, `GeneratedCharPrefabBuilder` auto-assembles each PNG into a
+single-sprite prefab under `Resources/Chars/` (same shape as the LayerLab slime),
+and the roster mapping lives in `Scripts/View/CharacterArt.cs`. Regenerate with:
+
+```bash
+python3 tools/ArtGen/gen_chars.py
+```
+
+These are our own generated output and carry no third-party license. Unlike the
+Asset Store packs they ship in the repo, so the prefabs resolve everywhere.
+
 ## Generated SFX (shipped — our own output, no third-party license)
 
 17 real 16-bit PCM WAVs are produced by **`tools/SfxGen`** (bfxr-style procedural

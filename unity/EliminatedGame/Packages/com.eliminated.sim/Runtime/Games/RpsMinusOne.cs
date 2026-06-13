@@ -16,9 +16,9 @@ namespace Eliminated.Sim.Games
     {
         // Deliberately roomy: players read two throws, decide, then commit. The earlier
         // 4.5/3/2 felt frantic (you barely saw the buttons before the phase flipped).
-        private const float PickT = 6.5f;
-        private const float DropT = 4.5f;
-        private const float ResolveT = 2.6f;
+        private const float PickT = 9f;
+        private const float DropT = 6f;
+        private const float ResolveT = 3.2f;
         private static readonly string[] Throws = { "R", "P", "S" };
 
         private static int Cmp(string a, string b)

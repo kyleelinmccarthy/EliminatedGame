@@ -13,9 +13,9 @@ namespace Eliminated.Game.Save
         public bool subtitles = true;       // captions for Game Master VO / cues
         public bool reduceFlashAndShake = false;
         public float masterVolume = 1f;
-        public float sfxVolume = 1f;        // "Game sound": SFX + the announcer VO + in-game music
-        public float musicVolume = 0.7f;    // "Background music": menu/lobby loops only (not in-round music)
-        public bool musicEnabled = true;    // master on/off for ALL music; game SFX/VO stay on independently
+        public float sfxVolume = 1f;        // "Game sound": SFX + announcer VO + gameplay music (Mingle/Musical Chairs)
+        public float musicVolume = 0.7f;    // "Background music": menu/lobby/round ambiance loops
+        public bool musicEnabled = true;    // on/off for BACKGROUND music only; SFX/VO + gameplay music stay on
         public string locale = "en";
 
         // Authoritative game server for Play Online. Defaults to a localhost dev

@@ -40,8 +40,13 @@ namespace Eliminated.Game.View
         private readonly List<Vector3> _pickupWorld = new List<Vector3>(); // orb "?" anchors this frame
         private struct Reveal { public string ActorId; public Vector3 World; public float Born; public string Text; public Color Color; }
         private readonly List<Reveal> _reveals = new List<Reveal>();
-        private GUIStyle _orbStyle, _revealStyle;
+        private GUIStyle _orbStyle, _revealStyle, _bannerStyle;
         private const float RevealLife = 1.5f;
+        // A bold, unmissable banner when YOU grab a powerup — spells out what it does.
+        private string _myPickupText;
+        private Color _myPickupColor = Color.white;
+        private float _myPickupBorn = -10f;
+        private const float MyPickupLife = 2.0f;
 
         // Arena theme. The live stage persists for the whole series, so the floor +
         // walls are re-themed each round (see MaybeAdvanceArena) rather than fixed at build.
@@ -570,6 +575,26 @@ namespace Eliminated.Game.View
                 {
                     Disc(mingle.PlatformX, mingle.PlatformY, mingle.PlatformR, new Color(0.227f, 0.169f, 0.369f), 0.012f);        // platform #3a2b5e
                     Disc(mingle.PlatformX, mingle.PlatformY, mingle.PlatformR * 0.66f, new Color(0.133f, 0.094f, 0.212f), 0.014f); // inner #221836
+                    // Spinning carousel: alternating gold/pink spokes + orbiting rim seats, rotated by
+                    // mingle.Spin, so the platform visibly TURNS while the music plays (the riders turn with it).
+                    {
+                        const int spokes = 8;
+                        for (int k = 0; k < spokes; k++)
+                        {
+                            float ang = mingle.Spin + k * (6.2831853f / spokes);
+                            float ex = mingle.PlatformX + Mathf.Cos(ang) * mingle.PlatformR * 0.97f;
+                            float ey = mingle.PlatformY + Mathf.Sin(ang) * mingle.PlatformR * 0.97f;
+                            Color sc = (k % 2 == 0) ? new Color(1f, 0.835f, 0.31f, 0.30f) : new Color(1f, 0.36f, 0.62f, 0.26f);
+                            Bar(mingle.PlatformX, mingle.PlatformY, ex, ey, 26f, sc, 0.013f, 0.015f);
+                        }
+                        for (int k = 0; k < 4; k++)
+                        {
+                            float ang = mingle.Spin + k * (6.2831853f / 4f);
+                            float rx = mingle.PlatformX + Mathf.Cos(ang) * mingle.PlatformR * 0.86f;
+                            float ry = mingle.PlatformY + Mathf.Sin(ang) * mingle.PlatformR * 0.86f;
+                            Disc(rx, ry, 9f, new Color(1f, 0.92f, 0.55f, 0.55f), 0.017f);
+                        }
+                    }
                     // One translucent pad per room: barely visible while milling (so the
                     // floor reads through), then clear GREEN (correct size) / RED (wrong)
                     // once the grouping phase starts. Alpha is honoured by the transparent
@@ -716,18 +741,15 @@ namespace Eliminated.Game.View
                     Box(640f, 360f, 6f, 420f, new Color(1f, 1f, 1f, 0.10f), 0.04f, 0.02f); // subtle divider only
                     // Reveal the focal duel's THROWS as hand icons so you can see what your rival
                     // picked (rock=orb, paper=slab, scissors=V) — and which one they KEPT on resolve.
-                    RpsMinusOne.DuelView focal = null;
-                    if (rps.Duels != null)
-                    {
-                        foreach (var d in rps.Duels) if (d.Status != "done" && !string.IsNullOrEmpty(d.B)) { focal = d; break; }
-                        if (focal == null) foreach (var d in rps.Duels) if (d.Status != "done") { focal = d; break; }
-                        if (focal == null && rps.Duels.Count > 0) focal = rps.Duels[0];
-                    }
+                    RpsMinusOne.DuelView focal = FocalDuel(rps, LocalId());
                     if (focal != null)
                     {
                         DrawRpsThrows(470f, focal.AThrows, focal.AKeep, rps.Phase); // A (bottom player) — throws above it
                         DrawRpsThrows(250f, focal.BThrows, focal.BKeep, rps.Phase); // B (top player) — throws below it
                     }
+                    // Gold "YOU" ring + bobbing orb on the local duelist so you instantly read
+                    // which fighter is yours (1v1 has no team rings to lean on).
+                    DrawYouMarker(snap, LocalId());
                     break;
                 }
 
@@ -896,6 +918,7 @@ namespace Eliminated.Game.View
 
             DrawMysteryOrbs();
             DrawReveals();
+            DrawMyPickupBanner();
         }
 
         // The "?" floating over every pickup orb — identical for all, so the ground
@@ -952,9 +975,9 @@ namespace Eliminated.Game.View
 
         // One centered glyph/string with a 4-way black outline (its own dark backdrop,
         // so it stays legible over any bright floor). Shared by "?" orbs and reveals.
-        private void OutlinedGlyph(float x, float y, string s, GUIStyle style, Color fill, float outline, float alpha = 1f)
+        private void OutlinedGlyph(float x, float y, string s, GUIStyle style, Color fill, float outline, float alpha = 1f, float width = 240f)
         {
-            const float bw = 240f; float bh = style.fontSize + 8f;
+            float bw = width; float bh = style.fontSize + 10f;
             var r = new Rect(x - bw * 0.5f, y - bh * 0.5f, bw, bh);
             var prev = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.85f * alpha);
@@ -996,6 +1019,37 @@ namespace Eliminated.Game.View
                 if (d < best) { best = d; actorId = kv.Key; }
             }
             _reveals.Add(new Reveal { ActorId = actorId, World = world0, Born = Time.unscaledTime, Text = text, Color = col });
+
+            // If it was YOU who grabbed it, slam up a bold banner that says what it DOES.
+            var locals = _sim?.LocalPlayerIds;
+            if (actorId != null && locals != null && locals.Contains(actorId))
+            {
+                _myPickupText = PowerupCatalog.RevealBanner(fx.Tag);
+                _myPickupColor = col;
+                _myPickupBorn = Time.unscaledTime;
+            }
+        }
+
+        // The big "you grabbed X — it does Y" banner, centred and high so it can't be
+        // missed in the scrum. Fades over MyPickupLife. Local-player pickups only.
+        private void DrawMyPickupBanner()
+        {
+            if (_myPickupText == null) return;
+            float t = Time.unscaledTime - _myPickupBorn;
+            if (t >= MyPickupLife) { _myPickupText = null; return; }
+            if (_bannerStyle == null)
+            {
+                var font = Resources.Load<Font>("Fonts/Baloo2-Bold");
+                _bannerStyle = new GUIStyle { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = 34 };
+                if (font != null) _bannerStyle.font = font;
+            }
+            float k = t / MyPickupLife;
+            float alpha = Mathf.Clamp01(t < 0.12f ? t / 0.12f : 1f - Mathf.Pow(k, 3f)); // pop in, ease out
+            float pop = t < 0.18f ? 1f + (0.18f - t) * 1.2f : 1f;                       // tiny overshoot on entry
+            _bannerStyle.fontSize = Mathf.RoundToInt(34 * pop);
+            float y = Screen.height * 0.20f;
+            var col = new Color(_myPickupColor.r, _myPickupColor.g, _myPickupColor.b, alpha);
+            OutlinedGlyph(Screen.width * 0.5f, y, _myPickupText, _bannerStyle, col, 2.5f, alpha, Mathf.Min(Screen.width - 40f, 900f));
         }
 
         // One "#N" tag centered above (x, y) in GUI space. The black outline gives each
@@ -1235,16 +1289,29 @@ namespace Eliminated.Game.View
             return L;
         }
 
-        // Show only the focal duel (first not-done, else first): A bottom, B top —
-        // everyone else hidden, so the preview reads as a clean face-off.
-        private static PlayerLayout RpsLayout(RpsMinusOne.RpsData rps)
+        // Pick the duel to stage front-and-centre. Prefer the LOCAL player's own live
+        // duel: otherwise a player whose duel isn't first on the list sees a stranger's
+        // face-off on stage while their OWN throw controls sit in the HUD — it reads as
+        // "not my turn" even though it is (the bug this fixes). Falls back to the first
+        // live 1v1, then any live duel, then the first duel.
+        private static RpsMinusOne.DuelView FocalDuel(RpsMinusOne.RpsData rps, string localId)
+        {
+            if (rps?.Duels == null || rps.Duels.Count == 0) return null;
+            if (!string.IsNullOrEmpty(localId))
+                foreach (var d in rps.Duels)
+                    if (d.Status != "done" && (d.A == localId || d.B == localId)) return d;
+            foreach (var d in rps.Duels) if (d.Status != "done" && !string.IsNullOrEmpty(d.B)) return d; // a real 1v1, not a bye
+            foreach (var d in rps.Duels) if (d.Status != "done") return d;
+            return rps.Duels[0];
+        }
+
+        // Show only the focal duel (the local player's own when they're in one): A bottom,
+        // B top — everyone else hidden, so the preview reads as a clean face-off.
+        private PlayerLayout RpsLayout(RpsMinusOne.RpsData rps)
         {
             var L = new PlayerLayout { HideUnlisted = true };
-            if (rps.Duels == null || rps.Duels.Count == 0) return L;
-            RpsMinusOne.DuelView focal = null;
-            foreach (var d in rps.Duels) if (d.Status != "done" && !string.IsNullOrEmpty(d.B)) { focal = d; break; } // a real 1v1, not a bye
-            if (focal == null) foreach (var d in rps.Duels) if (d.Status != "done") { focal = d; break; }
-            if (focal == null) focal = rps.Duels[0];
+            var focal = FocalDuel(rps, LocalId());
+            if (focal == null) return L;
             if (!string.IsNullOrEmpty(focal.A)) { L.Pos[focal.A] = new Vector2(640f, 533f); L.Facing[focal.A] = -Mathf.PI / 2f; }
             if (!string.IsNullOrEmpty(focal.B)) { L.Pos[focal.B] = new Vector2(640f, 187f); L.Facing[focal.B] = Mathf.PI / 2f; }
             return L;
@@ -1327,15 +1394,17 @@ namespace Eliminated.Game.View
         }
 
         // ── Prop builders ────────────────────────────────────────────────
-        // Caller-doll tuning. The real "Squid Game Doll" FBX (Resources/Models/doll) is now used —
-        // FitDoll auto-scales it DOWN to DollHeight whatever its native size, and stands it on the
-        // floor. It carries the FBX's own material colours (no image textures needed). If it ever
-        // renders wrong in the editor, flip UseDollModel back to false (procedural fallback) or nudge
-        // the knobs below: DollPitch (lay-flat fix), DollYaw (facing), DollHeight (size).
+        // Caller-doll tuning. The real "Squid Game Doll" FBX (Resources/Models/doll) is used. FitDoll
+        // AUTO-STANDS it upright and AUTO-SCALES it to DollHeight whatever the FBX's native size/axis,
+        // and it keeps the FBX's own material colours. If she still looks wrong in the editor, nudge:
+        //   DollPitch  — set 180 if she ends up UPSIDE-DOWN (auto-stand picked the wrong end).
+        //   DollYaw    — 0/90/180/270 to turn her to FACE the crowd.
+        //   DollHeight — overall size in world units (~2.3u = one blob).
+        // Or set UseDollModel=false to fall back to the clean procedural doll.
         private const bool UseDollModel = true;
-        private const float DollHeight = 4.2f; // world units tall — looms over the ~2.3u-tall blobs
-        private const float DollPitch = 0f;    // X° — set to ±90 if the FBX imports lying flat (Z-up)
-        private const float DollYaw = 180f;    // Y° — set to 0/90/270 if it faces the wrong way
+        private const float DollHeight = 4.6f; // world units tall — a looming caller (~2 blobs)
+        private const float DollPitch = 0f;    // X° — flip to 180 if she stands upside-down
+        private const float DollYaw = 180f;    // Y° — turn to face the crowd
         private float _dollFootY;              // model's foot height vs its root, after fitting
 
         // The caller doll. Uses the imported model at Resources/Models/doll if present —
@@ -1352,10 +1421,9 @@ namespace Eliminated.Game.View
                 {
                     _doll = Instantiate(prefab, transform);
                     _doll.name = "CallerDoll";
-                    _doll.transform.rotation = Quaternion.Euler(DollPitch, DollYaw, 0f);
                     _dollRenderers = _doll.GetComponentsInChildren<Renderer>(true);
                     _dollMpb = new MaterialPropertyBlock();
-                    FitDoll();
+                    FitDoll(); // auto-stands the figure, scales to DollHeight, records the foot offset
                 }
             }
             if (_doll == null) { DrawDoll(dx, dy, alert); return; } // procedural fallback until the model is imported
@@ -1363,30 +1431,70 @@ namespace Eliminated.Game.View
             _dollUsed = true;
             if (!_doll.activeSelf) _doll.SetActive(true);
             _doll.transform.position = LogicalSpace.ToWorld(dx, dy) - new Vector3(0f, _dollFootY, 0f); // feet on the floor
-            // Tint the whole model on an alert (red glare / icy freeze), white otherwise.
-            Color tint = alert ? new Color(1f, 0.42f, 0.42f) : Color.white;
+            // Do NOT overwrite the model's own material colours — the old code forced _Color = white,
+            // which is exactly why she rendered ALL-WHITE. On an alert we only add an emissive GLOW
+            // (red on RED-light / Simon-freeze); her real colours stay intact.
             if (_dollRenderers != null)
+            {
+                Color glow = alert ? new Color(0.7f, 0.06f, 0.10f) : Color.black;
                 foreach (var r in _dollRenderers)
                 {
                     if (r == null) continue;
                     r.GetPropertyBlock(_dollMpb);
-                    if (r.sharedMaterial != null && r.sharedMaterial.HasProperty("_Color")) _dollMpb.SetColor("_Color", tint);
+                    _dollMpb.SetColor("_EmissionColor", glow);
                     r.SetPropertyBlock(_dollMpb);
                 }
+            }
         }
 
-        // Scale the model to DollHeight regardless of its native size and record where its
-        // feet sit, so it can be planted on the arena floor.
+        // Stand the model upright, scale it to DollHeight, and record its foot height — robust to ANY
+        // FBX size/axis. Measures from SHARED-MESH bounds (always valid; a skinned mesh's world bounds
+        // are stale right after Instantiate, which is why she came in giant), auto-rotates the longest
+        // native axis to world-up (handles Z-up exports lying on their back), then applies the manual
+        // DollPitch/DollYaw on top for fine-tuning facing / a head-up-vs-down flip.
         private void FitDoll()
         {
             if (_dollRenderers == null || _dollRenderers.Length == 0) return;
-            Bounds b = _dollRenderers[0].bounds;
-            for (int i = 1; i < _dollRenderers.Length; i++) b.Encapsulate(_dollRenderers[i].bounds);
-            float h = Mathf.Max(0.001f, b.size.y);
-            _doll.transform.localScale *= DollHeight / h;
-            b = _dollRenderers[0].bounds; // re-measure after scaling
-            for (int i = 1; i < _dollRenderers.Length; i++) b.Encapsulate(_dollRenderers[i].bounds);
-            _dollFootY = b.min.y - _doll.transform.position.y;
+            _doll.transform.localScale = Vector3.one;
+            _doll.transform.localRotation = Quaternion.identity;
+
+            Bounds nat = DollMeshBounds(_doll.transform.worldToLocalMatrix); // native size, doll-local frame
+            Vector3 s = nat.size;
+            Quaternion stand =
+                (s.y >= s.x && s.y >= s.z) ? Quaternion.identity                  // already Y-up
+              : (s.z >= s.x && s.z >= s.y) ? Quaternion.Euler(90f, 0f, 0f)        // Z-up (Blender/Maya) → Y-up
+              :                              Quaternion.Euler(0f, 0f, 90f);       // X-up → Y-up
+            _doll.transform.localRotation = stand * Quaternion.Euler(DollPitch, DollYaw, 0f);
+
+            Bounds w = DollMeshBounds(Matrix4x4.identity); // world bounds now (root is at identity-ish parent)
+            float h = Mathf.Max(0.001f, w.size.y);
+            _doll.transform.localScale = Vector3.one * (DollHeight / h);
+
+            w = DollMeshBounds(Matrix4x4.identity);
+            _dollFootY = w.min.y - _doll.transform.position.y;
+        }
+
+        // Combined AABB of every doll mesh, each transformed by <paramref name="toFrame"/> × the
+        // renderer's localToWorld. Uses sharedMesh.bounds (valid even before a skinned mesh renders).
+        private Bounds DollMeshBounds(Matrix4x4 toFrame)
+        {
+            bool has = false; Bounds acc = default;
+            foreach (var r in _dollRenderers)
+            {
+                if (r == null) continue;
+                Mesh m = (r is SkinnedMeshRenderer smr) ? smr.sharedMesh
+                       : (r.TryGetComponent<MeshFilter>(out var mf) ? mf.sharedMesh : null);
+                if (m == null) continue;
+                Bounds mb = m.bounds; Vector3 c = mb.center, e = mb.extents;
+                Matrix4x4 mtx = toFrame * r.localToWorldMatrix;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = c + new Vector3((i & 1) == 0 ? -e.x : e.x, (i & 2) == 0 ? -e.y : e.y, (i & 4) == 0 ? -e.z : e.z);
+                    var p = mtx.MultiplyPoint3x4(corner);
+                    if (!has) { acc = new Bounds(p, Vector3.zero); has = true; } else acc.Encapsulate(p);
+                }
+            }
+            return acc;
         }
 
         // The procedural Red-Light-Green-Light caller — "Younghee", the Squid Game doll:

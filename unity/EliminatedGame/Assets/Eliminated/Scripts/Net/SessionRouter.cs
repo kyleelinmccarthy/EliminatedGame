@@ -34,5 +34,6 @@ namespace Eliminated.Game.Net
         public RoundReport LastRoundReport => Active?.LastRoundReport;
         public SeriesResult SeriesResult => Active?.SeriesResult;
         public string NameOf(string playerId) => Active?.NameOf(playerId) ?? playerId;
+        public int NumberOf(string playerId) => Active?.NumberOf(playerId) ?? 0;
     }
 }

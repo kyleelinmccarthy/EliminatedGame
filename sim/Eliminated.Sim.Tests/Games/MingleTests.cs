@@ -29,6 +29,32 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
+        public void There_are_four_corner_rooms_set_well_off_the_platform()
+        {
+            var (g, _) = Make(0, 6);
+            Assert.Equal(4, g.Rooms.Count);
+            var center = new Vec2(Mingle.PlatformX, Mingle.PlatformY);
+            foreach (var r in g.Rooms)
+                Assert.True(Vec2.Distance(new Vec2(r.X, r.Y), center) > Mingle.PlatformR + 200f,
+                    "each room should be a real sprint from the platform");
+        }
+
+        [Fact]
+        public void During_the_music_riders_orbit_the_platform_instead_of_darting_around()
+        {
+            var (g, actors) = Make(0, 6, seed: 5);
+            var center = new Vec2(Mingle.PlatformX, Mingle.PlatformY);
+            var a = actors[0];
+            float startAng = (float)System.Math.Atan2(a.Pos.Y - center.Y, a.Pos.X - center.X);
+            float startRad = Vec2.Distance(a.Pos, center);
+            for (int i = 0; i < 20 && g.CurrentPhase == Mingle.MinglePhase.Wander; i++) g.Tick(Constants.Dt);
+            Assert.True(Vec2.Distance(a.Pos, center) <= Mingle.PlatformR);                 // still on the platform
+            Assert.True(System.Math.Abs(Vec2.Distance(a.Pos, center) - startRad) < 12f);   // same radius (riding, not wandering)
+            float endAng = (float)System.Math.Atan2(a.Pos.Y - center.Y, a.Pos.X - center.X);
+            Assert.True(System.Math.Abs(endAng - startAng) > 0.2f);                        // but the angle advanced with the spin
+        }
+
+        [Fact]
         public void Players_are_confined_to_the_platform_during_the_music()
         {
             var (g, actors) = Make(1, 5, seed: 2);

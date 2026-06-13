@@ -94,6 +94,15 @@ namespace Eliminated.Game.Net
             return playerId;
         }
 
+        public int NumberOf(string playerId)
+        {
+            var r = _room;
+            if (r?.players != null)
+                foreach (var p in r.players)
+                    if (p.Id == playerId) return p.Number;
+            return 0;
+        }
+
         // Results are rebuilt only when the room message changes (cheap, but avoids
         // re-allocating every OnGUI frame during the result screens).
         private RoomMsg _resultsFor;

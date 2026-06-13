@@ -21,8 +21,16 @@ namespace Eliminated.Game.Audio
         private int _voice;
         private AudioSource[] _announce; // dedicated sources for the Game-Master announcer (see Speak)
         private AudioSource _music;
+        private AudioSource _musicFade; // second loop source: the incoming track during a rotation crossfade
         private string _currentMusic; // the loop clip currently loaded (so SetMusic can no-op)
         private bool _ensuredListener;
+
+        // Crossfade state (rotation only). When a DIFFERENT track is next in the playlist we blend
+        // into it over CrossfadeDur instead of hard-cutting: _music fades out, _musicFade fades in,
+        // then the two source references swap so _music is always the foreground loop.
+        private const float CrossfadeDur = 3.0f; // seconds; tune for how gradual the lobby blend feels
+        private bool _fading;
+        private float _fadeT; // seconds elapsed into the current crossfade
 
         // Rotation state: non-null only while cycling several tracks (the editor lobby);
         // null means a single pinned looping track (every other screen).
@@ -31,11 +39,13 @@ namespace Eliminated.Game.Audio
         private bool _rotating;         // true while cycling _playlist (kept across pins so we resume position)
         private float _trackElapsed;    // wall-clock seconds the current rotation track has played
         private float _notPlaying;      // consecutive seconds isPlaying read false (flicker/focus tolerance)
-        // Which volume bucket the current loop belongs to. IN-GAME music (during a live
-        // round) is "game sound" and rides sfxVolume alongside SFX + the announcer;
-        // front-of-house (menu/lobby) music is "background music" on its own musicVolume.
-        // The same track can serve both (e.g. music_sinister on the menu AND in regular
-        // rounds), so this is set by the caller per context, not inferred from the clip.
+        // Which bucket the current loop belongs to. GAMEPLAY music — a track that is a
+        // game MECHANIC (Mingle / Musical Chairs: you act when it stops) — is "game sound":
+        // it rides sfxVolume alongside SFX + the announcer and IGNORES the music mute
+        // (muting music must never hide a gameplay cue; only the sound/master mute can).
+        // Everything else (menu, lobby, regular-round ambiance, final, results) is
+        // "background music" on musicVolume, gated by the musicEnabled toggle. Set by
+        // the caller per context, not inferred from the clip.
         private bool _musicIsGame;
 
         // ---- Background music ----------------------------------------------------------
@@ -74,12 +84,10 @@ namespace Eliminated.Game.Audio
                 _announce[i].spatialBlend = 0f;
             }
 
-            var musicGo = new GameObject("Music");
-            musicGo.transform.SetParent(transform, false);
-            _music = musicGo.AddComponent<AudioSource>();
-            _music.loop = true;
-            _music.playOnAwake = false;
-            _music.spatialBlend = 0f;
+            _music = MakeMusicSource("Music", loop: true);
+            // Second music source, used only to crossfade the editor-lobby rotation (Sinister
+            // ↔ Pink Soldiers). It carries the incoming track while _music fades out.
+            _musicFade = MakeMusicSource("MusicFade", loop: false);
 
             ApplyVolumes();
             // No track is started here — the HUD music director (HudUi.UpdateMusic) selects the
@@ -89,11 +97,27 @@ namespace Eliminated.Game.Audio
         /// <summary>The track currently loaded on the music source (so SetMusic can no-op).</summary>
         public string CurrentMusic => _currentMusic;
 
-        /// <summary>Pin one looping track. <paramref name="gameMusic"/> picks the volume
-        /// bucket: true → in-game music (rides sfxVolume, the "game sound" channel);
-        /// false → front-of-house background music (musicVolume). No-op on the track swap
-        /// if already on it, but the bucket/level are always refreshed first (the same
-        /// track can move between menu and gameplay). Ignores null/empty + missing clips.</summary>
+        // Create a 2D, non-autoplay music source parented under this service. Used by Init and as a
+        // lazy fallback: an editor hot-reload mid-Play doesn't re-run Init, so a field added by the
+        // recompile (e.g. _musicFade) can be null even though the older _music survived — callers
+        // that need a source rebuild it through here rather than NRE.
+        private AudioSource MakeMusicSource(string name, bool loop)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            var src = go.AddComponent<AudioSource>();
+            src.loop = loop;
+            src.playOnAwake = false;
+            src.spatialBlend = 0f;
+            return src;
+        }
+
+        /// <summary>Pin one looping track. <paramref name="gameMusic"/> picks the bucket:
+        /// true → gameplay-mechanic music (rides sfxVolume, the "game sound" channel, and
+        /// plays even when music is muted — it IS gameplay); false → background music
+        /// (musicVolume, gated by the music toggle). No-op on the track swap if already
+        /// on it, but the bucket/level are always refreshed first (the same track can
+        /// move between buckets). Ignores null/empty + missing clips.</summary>
         public void SetMusic(string clip, bool gameMusic = false)
         {
             if (_music == null || string.IsNullOrEmpty(clip)) return;
@@ -102,6 +126,7 @@ namespace Eliminated.Game.Audio
             _musicIsGame = gameMusic;
             _music.volume = MusicVol();
             if (!_rotating && clip == _currentMusic) return; // already pinned to this loop
+            StopFade();           // leaving the rotation → drop any crossfade in progress
             _rotating = false;    // leave rotation mode (keep _playlist/_playlistIdx so we can resume it)
             _music.loop = true;   // a single track loops until SetMusic/SetMusicPlaylist changes it
             var loaded = Load(clip);
@@ -109,16 +134,19 @@ namespace Eliminated.Game.Audio
             _currentMusic = clip;
             _music.clip = loaded;
             if (loaded.loadState != AudioDataLoadState.Loaded) loaded.LoadAudioData(); // ready before Play
-            if (MusicEnabled) _music.Play();
+            if (gameMusic || MusicEnabled) _music.Play();
         }
 
         /// <summary>Rotate the background music through <paramref name="tracks"/> in order,
-        /// advancing when each finishes and wrapping. Used only for the editor lobby (Pink
+        /// wrapping. A change to a DIFFERENT next track crossfades over CrossfadeDur (see
+        /// BeginCrossfade/TickCrossfade); a repeated track (e.g. Pink Soldiers listed twice)
+        /// hard-restarts at its seamless loop point. Used only for the editor lobby (Pink
         /// Soldiers ↔ Sinister). No-op if already rotating this exact set; SetMusic leaves rotation.</summary>
         public void SetMusicPlaylist(string[] tracks)
         {
             if (_music == null || tracks == null || tracks.Length == 0) return;
             if (_rotating && SamePlaylist(tracks)) return; // already cycling this set — let it keep going
+            StopFade();                                    // (re)starting a set → no leftover crossfade
             if (!SamePlaylist(tracks)) _playlistIdx = 0;   // a different set → start at the top
             _playlist = tracks;                            // (same set → keep _playlistIdx, resume where we left off)
             _rotating = true;
@@ -148,9 +176,65 @@ namespace Eliminated.Game.Audio
             if (clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
         }
 
+        // Start blending the rotation into <paramref name="name"/>: bring it up on the second
+        // source (at volume 0) while Update fades _music out. Falls back to a hard load on a
+        // missing clip so the rotation never stalls.
+        private void BeginCrossfade(string name)
+        {
+            var clip = Load(name);
+            if (clip == null) { _trackElapsed = 0f; return; } // missing → let the current track keep playing
+            if (_musicFade == null) _musicFade = MakeMusicSource("MusicFade", loop: false); // hot-reload safety
+            _musicFade.clip = clip;
+            _musicFade.loop = false;
+            _musicFade.volume = 0f;
+            if (clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
+            _currentMusic = name; // the incoming track is the one now "current"
+            _musicFade.Play();
+            _fading = true;
+            _fadeT = 0f;
+        }
+
+        // Advance the in-progress crossfade. When it completes, the incoming source becomes the
+        // foreground loop (sources swap) and the outgoing one is stopped.
+        private void TickCrossfade()
+        {
+            _fadeT += Time.unscaledDeltaTime;
+            float vol = MusicVol();
+            float k = Mathf.Clamp01(_fadeT / CrossfadeDur);
+            // Equal-power (sin/cos) blend so the combined loudness stays steady through the middle
+            // of the fade rather than dipping the way a straight linear cross would.
+            _music.volume = vol * Mathf.Cos(k * (0.5f * Mathf.PI));
+            _musicFade.volume = vol * Mathf.Sin(k * (0.5f * Mathf.PI));
+            if (k < 1f) return;
+
+            _music.Stop();
+            var spent = _music; _music = _musicFade; _musicFade = spent; // incoming becomes foreground
+            _music.volume = vol;
+            _fading = false;
+            _fadeT = 0f;
+            // The incoming track already played CrossfadeDur during the blend — keep elapsed aligned
+            // to its playhead so its own end-of-loop crossfade fires while audio is still present.
+            _trackElapsed = CrossfadeDur;
+            _notPlaying = 0f;
+        }
+
+        // Abandon any crossfade in progress and silence the secondary source (leaving the rotation,
+        // music toggled off, etc.). Safe to call when no fade is running.
+        private void StopFade()
+        {
+            _fading = false;
+            _fadeT = 0f;
+            if (_musicFade != null && _musicFade.isPlaying) _musicFade.Stop();
+        }
+
         private static bool MusicEnabled => SaveService.Current?.settings?.musicEnabled ?? true;
 
-        // Level for the current loop, by bucket: in-game music tracks the "game sound"
+        // Should the loaded loop be audible right now? Background music obeys the music
+        // toggle; gameplay-mechanic music (Mingle / Musical Chairs) always plays — the
+        // track is a game cue, silenced only by the sound/master mute, never by 🎵.
+        private bool LoopOn => _musicIsGame || MusicEnabled;
+
+        // Level for the current loop, by bucket: gameplay music tracks the "game sound"
         // (sfxVolume) channel with the SFX + announcer; background music has its own
         // musicVolume. Master is applied globally via AudioListener.volume on top.
         private float MusicVol()
@@ -175,8 +259,7 @@ namespace Eliminated.Game.Audio
             // and honor the music toggle here — whichever AudioService owns the loop silences it,
             // so a stale Instance reference can never leave music audibly playing.
             if (_music == null || _music.clip == null) return;
-            bool musicOn = MusicEnabled;
-            if (!musicOn) { if (_music.isPlaying) _music.Stop(); _trackElapsed = 0f; _notPlaying = 0f; return; }
+            if (!LoopOn) { if (_music.isPlaying) _music.Stop(); StopFade(); _trackElapsed = 0f; _notPlaying = 0f; return; }
 
             if (_rotating)
             {
@@ -185,25 +268,44 @@ namespace Eliminated.Game.Audio
                 // the track isn't over); reacting to that is what made the song swap (or restart)
                 // on tab-in. Freezing while unfocused + advancing on elapsed time makes tab-out/in
                 // seamless — the song only changes when it has genuinely played out.
-                var clip = _music.clip;
                 if (Application.isFocused)
                 {
-                    if (clip != null) _trackElapsed += Time.unscaledDeltaTime;
-                    if (clip == null || _trackElapsed >= clip.length)
+                    if (_fading)
                     {
-                        _playlistIdx = (_playlistIdx + 1) % _playlist.Length; // played out → next track
-                        LoadTrack(_playlist[_playlistIdx]);
-                        _trackElapsed = 0f;
-                        _notPlaying = 0f;
-                        _music.Play();
+                        TickCrossfade(); // mid-blend: drive volumes, swap sources when it completes
                     }
-                    else if (_music.isPlaying) _notPlaying = 0f;
                     else
                     {
-                        // Not finished but not playing: only nudge Play() after a sustained gap (boot
-                        // decode / a real stall), never on a 1-frame blip — so nothing restarts mid-track.
-                        _notPlaying += Time.unscaledDeltaTime;
-                        if (_notPlaying >= 0.3f) { _music.Play(); _notPlaying = 0f; }
+                        var clip = _music.clip;
+                        if (clip != null) _trackElapsed += Time.unscaledDeltaTime;
+                        string next = _playlist[(_playlistIdx + 1) % _playlist.Length];
+                        if (clip == null || _trackElapsed >= clip.length)
+                        {
+                            // Reached the end and the next entry is the SAME track (Pink Soldiers is
+                            // listed twice for airtime): hard, seamless restart — crossfading a track
+                            // with itself only phases. Different tracks take the crossfade branch
+                            // below, which fires before we ever reach the clip's end.
+                            _playlistIdx = (_playlistIdx + 1) % _playlist.Length;
+                            LoadTrack(_playlist[_playlistIdx]);
+                            _trackElapsed = 0f;
+                            _notPlaying = 0f;
+                            _music.Play();
+                        }
+                        else if (next != _currentMusic && _trackElapsed >= clip.length - CrossfadeDur)
+                        {
+                            // Nearing the end with a DIFFERENT track next → blend into it over
+                            // CrossfadeDur instead of hard-cutting (the abrupt swap we're fixing).
+                            _playlistIdx = (_playlistIdx + 1) % _playlist.Length;
+                            BeginCrossfade(_playlist[_playlistIdx]);
+                        }
+                        else if (_music.isPlaying) _notPlaying = 0f;
+                        else
+                        {
+                            // Not finished but not playing: only nudge Play() after a sustained gap (boot
+                            // decode / a real stall), never on a 1-frame blip — so nothing restarts mid-track.
+                            _notPlaying += Time.unscaledDeltaTime;
+                            if (_notPlaying >= 0.3f) { _music.Play(); _notPlaying = 0f; }
+                        }
                     }
                 }
             }
@@ -256,9 +358,11 @@ namespace Eliminated.Game.Audio
         /// </summary>
         private AudioClip _spokenLine; // last stitched announcer line; freed when the next is built
 
-        public void Speak(IReadOnlyList<string> clipNames, float volume = 1f)
+        // Returns the spoken line's length in seconds (0 if nothing played), so callers can
+        // hold off the next line until this one finishes instead of cutting it off.
+        public float Speak(IReadOnlyList<string> clipNames, float volume = 1f)
         {
-            if (_announce == null || clipNames == null || clipNames.Count == 0) return;
+            if (_announce == null || clipNames == null || clipNames.Count == 0) return 0f;
 
             foreach (var src in _announce) src.Stop(); // cancel any line in flight
 
@@ -278,13 +382,14 @@ namespace Eliminated.Game.Audio
                 src.clip = line;
                 src.volume = vol;
                 src.PlayScheduled(AudioSettings.dspTime + 0.06);
-                return;
+                return line.length;
             }
 
             // Fallback (clip PCM unreadable): schedule clips on the pool. Non-wrapping index
             // so early clips aren't overwritten — a line longer than the pool loses its tail,
             // not its head. "@<ms>" beats still advance the schedule.
-            double at = AudioSettings.dspTime + 0.06;
+            double start = AudioSettings.dspTime + 0.06;
+            double at = start;
             int s = 0;
             for (int i = 0; i < clipNames.Count; i++)
             {
@@ -301,6 +406,7 @@ namespace Eliminated.Game.Audio
                 src.PlayScheduled(at);
                 at += clip.length;
             }
+            return (float)(at - start);
         }
 
         // Concatenate the named clips — plus "@<ms>" silent beats — into one mono AudioClip
@@ -355,14 +461,16 @@ namespace Eliminated.Game.Audio
             var s = SaveService.Current?.settings;
             float master = s?.masterVolume ?? 1f;
             AudioListener.volume = Mathf.Clamp01(master);
-            // Music can be silenced independently of game SFX (one-shot voices read
-            // sfxVolume in Play()). Stop the loop outright when disabled so it actually
-            // goes quiet now; Update() then keeps it stopped while the flag is off.
+            // Background music can be silenced independently of game SFX (one-shot voices
+            // read sfxVolume in Play()). Stop the loop outright when disabled so it actually
+            // goes quiet now; Update() then keeps it stopped while the flag is off. Gameplay
+            // music (LoopOn) is exempt — it's a game cue, only the master mute silences it.
             if (_music == null) return;
-            _music.volume = MusicVol(); // background → musicVolume; in-game music → sfxVolume
-            bool musicOn = s?.musicEnabled ?? true;
-            if (musicOn) { if (_music.clip != null && !_music.isPlaying) _music.Play(); }
-            else if (_music.isPlaying) _music.Stop();
+            // During a rotation crossfade TickCrossfade owns both sources' volumes — don't slam the
+            // outgoing one back to full here; it self-corrects next frame either way.
+            if (!_fading) _music.volume = MusicVol(); // background → musicVolume; gameplay music → sfxVolume
+            if (LoopOn) { if (_music.clip != null && !_music.isPlaying) _music.Play(); }
+            else { if (_music.isPlaying) _music.Stop(); StopFade(); }
         }
     }
 }
