@@ -110,7 +110,7 @@ namespace Eliminated.Sim.Games
                 }
                 if (a.IsBot) BotThink(a);
                 MoveActor(a, dt);
-                if (!a.Frozen) _powerups.Collect(a);
+                if (!a.Frozen) _powerups.Collect(a, Actors);
             }
 
             ResolveContacts();

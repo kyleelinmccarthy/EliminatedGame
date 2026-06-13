@@ -31,6 +31,8 @@ namespace Eliminated.Sim.Games
         protected const float DashDuration = 0.18f;
         private const float DizzyFreq = 8f;
         private const float DizzyAmp = 0.8f;
+        // 🍌 Slippery: fraction of the velocity gap closed each tick (low = more ice).
+        private const float SlipperyResponse = 0.12f;
 
         // ── Bookkeeping ──────────────────────────────────────────────────
         private readonly List<string> _elimOrder = new List<string>();   // earliest first
@@ -127,6 +129,10 @@ namespace Eliminated.Sim.Games
             a.PuVisionT = Dec(a.PuVisionT, dt);
             a.PuTinyT = Dec(a.PuTinyT, dt);
             a.PuGiantT = Dec(a.PuGiantT, dt);
+            a.PuCaffeineT = Dec(a.PuCaffeineT, dt);
+            a.PuSlipperyT = Dec(a.PuSlipperyT, dt);
+            a.PuDisguiseT = Dec(a.PuDisguiseT, dt);
+            if (a.PuDisguiseT <= 0f) a.DisguiseCharId = null; // drop the borrowed face
             a.DashCdT = Dec(a.DashCdT, dt);
             a.IFrameT = Dec(a.IFrameT, dt);
             a.DashT = Dec(a.DashT, dt);
@@ -167,9 +173,11 @@ namespace Eliminated.Sim.Games
         // ── Dash ─────────────────────────────────────────────────────────
         protected bool TryDash(Actor a)
         {
-            if (a.DashCdT > 0f || a.DashT > 0f) return false;
+            // ☕ Caffeine: dash with no cooldown (and never sets one).
+            bool caffeine = a.PuCaffeineT > 0f;
+            if ((!caffeine && a.DashCdT > 0f) || a.DashT > 0f) return false;
             a.DashT = DashDuration;
-            a.DashCdT = DashCooldown;
+            a.DashCdT = caffeine ? 0f : DashCooldown;
             a.IFrameT = DashIFrames;
             float dx = a.InDx, dy = a.InDy;
             if (dx * dx + dy * dy < 0.0025f)
@@ -201,7 +209,11 @@ namespace Eliminated.Sim.Games
                 var (dx, dy) = ResolveInput(a);
                 var dir = new Vec2(dx, dy).ClampMagnitude(1f);
                 float speed = MoveSpeed * StatusSpeedMul(a) * SizeSpeedMul(a) * RoleSpeedMul(a);
-                vel = dir * speed;
+                var desired = dir * speed;
+                // 🍌 Slippery: the floor is ice — ease toward the desired velocity
+                // instead of snapping, so you drift and overshoot. (Facing/anim stay
+                // on your intent so the struggle reads.) Otherwise: instant, as before.
+                vel = a.PuSlipperyT > 0f ? a.Vel + (desired - a.Vel) * SlipperyResponse : desired;
                 if (dir.SqrLength > 0.0025f)
                 {
                     a.Facing = (float)Math.Atan2(dir.Y, dir.X);

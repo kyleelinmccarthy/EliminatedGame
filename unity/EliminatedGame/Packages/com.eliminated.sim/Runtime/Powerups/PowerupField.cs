@@ -41,9 +41,13 @@ namespace Eliminated.Sim.Powerups
     public sealed class PowerupField
     {
         private static readonly PowerupKind[] Good =
-            { PowerupKind.Speed, PowerupKind.Shield, PowerupKind.Tiny, PowerupKind.Vision };
+            { PowerupKind.Speed, PowerupKind.Shield, PowerupKind.Tiny, PowerupKind.Vision,
+              PowerupKind.Caffeine, PowerupKind.Disguise };
+        // Curses + the Jumble wildcard share the "not good" roll — grabbing an orb
+        // is always a gamble.
         private static readonly PowerupKind[] Bad =
-            { PowerupKind.Reverse, PowerupKind.Slow, PowerupKind.Giant, PowerupKind.Dizzy };
+            { PowerupKind.Reverse, PowerupKind.Slow, PowerupKind.Giant, PowerupKind.Dizzy,
+              PowerupKind.Slippery, PowerupKind.Jumble };
 
         private readonly Rng _rng;
         private readonly float _every;
@@ -96,12 +100,20 @@ namespace Eliminated.Sim.Powerups
         {
             var pool = _rng.NextFloat() < _goodWeight ? Good : Bad;
             var kind = pool[_rng.NextInt(pool.Length)];
-            float x, y;
+            if (!RandomPoint(out float x, out float y)) return null; // nowhere safe yet
+            return new Pickup { Id = _nextId++, Kind = kind, X = x, Y = y, Bob = _rng.NextFloat() * 6.2831853f };
+        }
 
+        /// <summary>A uniform random point inside the spawnable area (a random
+        /// usable region if constrained, else the arena minus the margin). Shared
+        /// by orb spawning and the Jumble warp. False = no usable region yet.</summary>
+        private bool RandomPoint(out float x, out float y)
+        {
+            x = y = 0f;
             if (_spawnRegions != null)
             {
                 var regions = _spawnRegions();
-                if (regions == null || regions.Count == 0) return null;
+                if (regions == null || regions.Count == 0) return false;
                 // weight by usable area, pick a region, then a uniform point in it
                 float total = 0f;
                 var usable = new float[regions.Count];
@@ -132,15 +144,21 @@ namespace Eliminated.Sim.Powerups
                 x = _margin + _rng.NextFloat() * (Constants.ArenaW - 2f * _margin);
                 y = _margin + _rng.NextFloat() * (Constants.ArenaH - 2f * _margin);
             }
-
-            return new Pickup { Id = _nextId++, Kind = kind, X = x, Y = y, Bob = _rng.NextFloat() * 6.2831853f };
+            return true;
         }
 
         /// <summary>Drop pickups the caller no longer wants (e.g. swallowed by lava).</summary>
         public void Cull(Func<Pickup, bool> keep) => _pickups.RemoveAll(p => !keep(p));
 
-        /// <summary>If <paramref name="a"/> overlaps a pickup, apply it and return its kind.</summary>
-        public PowerupKind? Collect(Actor a)
+        /// <summary>Spawn a specific pickup at a position (scripted drops / tests).</summary>
+        public void AddPickup(PowerupKind kind, float x, float y)
+            => _pickups.Add(new Pickup { Id = _nextId++, Kind = kind, X = x, Y = y, Bob = 0f });
+
+        /// <summary>If <paramref name="a"/> overlaps a pickup, apply it and return
+        /// its kind. <paramref name="all"/> (the round's actors) lets the wildcards
+        /// reach the rest of the field: Disguise borrows another player's identity,
+        /// Jumble warps you elsewhere.</summary>
+        public PowerupKind? Collect(Actor a, IReadOnlyList<Actor> all = null)
         {
             for (int i = _pickups.Count - 1; i >= 0; i--)
             {
@@ -150,11 +168,46 @@ namespace Eliminated.Sim.Powerups
                 {
                     PowerupEffects.Apply(a, pk.Kind);
                     _pickups.RemoveAt(i);
+                    // The reveal floats where you grabbed it (icon + name, green/red/purple).
                     _emit?.Invoke(new Effect(EffectKind.Pickup, a.Pos.X, a.Pos.Y - 40f, 0f, pk.Kind.ToString()));
+                    if (pk.Kind == PowerupKind.Disguise) ApplyDisguise(a, all);
+                    else if (pk.Kind == PowerupKind.Jumble) ApplyJumble(a);
                     return pk.Kind;
                 }
             }
             return null;
+        }
+
+        /// <summary>Disguise: wear a random OTHER living player's face. Fizzles
+        /// (no effect) if there's nobody to impersonate.</summary>
+        private void ApplyDisguise(Actor a, IReadOnlyList<Actor> all)
+        {
+            if (all == null) { a.PuDisguiseT = 0f; return; }
+            Actor pick = null; int seen = 0;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var o = all[i];
+                if (o == a || !o.Alive || string.IsNullOrEmpty(o.CharacterId)) continue;
+                seen++;
+                if (_rng.NextInt(seen) == 0) pick = o; // reservoir sample → uniform pick
+            }
+            if (pick != null) { a.DisguiseCharId = pick.CharacterId; a.DisguiseNumber = pick.Number; }
+            else { a.PuDisguiseT = 0f; a.DisguiseCharId = null; a.DisguiseNumber = 0; } // nobody to mimic — fizzle cleanly
+        }
+
+        /// <summary>Jumble: blink to a random spot. Deliberately the WHOLE arena (not
+        /// the safe spawn regions), so in King of the Lava Islands it really can drop
+        /// you in the magma — you get the burn grace / a Bubble to scramble out.
+        /// "Could be safety. Could be lava."</summary>
+        private void ApplyJumble(Actor a)
+        {
+            const float m = 70f;
+            float nx = m + _rng.NextFloat() * (Constants.ArenaW - 2f * m);
+            float ny = m + _rng.NextFloat() * (Constants.ArenaH - 2f * m);
+            _emit?.Invoke(new Effect(EffectKind.Spark, a.Pos.X, a.Pos.Y));
+            a.Pos = new Vec2(nx, ny);
+            a.Vel = Vec2.Zero;
+            _emit?.Invoke(new Effect(EffectKind.Spark, nx, ny));
         }
 
         public List<PickupView> Snapshot()

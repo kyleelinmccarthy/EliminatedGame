@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using Eliminated.Sim.Model;
 using Eliminated.Sim.Games;
+using Eliminated.Sim.Powerups;
 using Eliminated.Sim.Room;
 using Eliminated.Game.SimBridge;
 using Eliminated.Game.Save;
@@ -52,7 +53,8 @@ namespace Eliminated.Game.UI
         private Page _page = Page.Menu;
         private Page _prevPage = Page.Menu; // tracks page entry so re-entered scroll views reset to the top
         private readonly HashSet<GameId> _htpExpanded = new HashSet<GameId>(); // cards with controls open
-        private Vector2 _htpScroll, _patchScroll, _playerScroll, _accScroll, _creditsScroll;
+        private Vector2 _htpScroll, _patchScroll, _playerScroll, _accScroll, _creditsScroll, _setScroll;
+        private float _setContentH = 460f; // settings scroll content height, remembered frame-to-frame
         private int _playerTab; // 0 = Players, 1 = Accessories
         private int _rebindIndex = -1;     // which binding is capturing a key, or -1
         private float _premuteVolume = 1f; // remembers level so the mute toggle can restore it
@@ -575,13 +577,14 @@ namespace Eliminated.Game.UI
                     if (_router.CurrentGame != null)
                     {
                         // Announce the game AND the room it's played in ("…Boomerang Brawl.
-                        // Welcome to Candy Kingdom!"). The room is derived from the same (round,
+                        // The arena: Candy Kingdom."). The room is derived from the same (round,
                         // game) the arena renders, so the caption always names the floor on screen.
+                        // 7s holds the text through the longer ceremonial voice line below.
                         string roomTheme = ArenaThemes.ForRound(_router.RoundIndex, _router.CurrentGame);
                         Caption(Loc.Get("gm.game_intro", _router.RoundIndex + 1, GameName(_router.CurrentGame.Value))
-                                + "  " + Loc.Get("gm.room_intro", ArenaThemes.DisplayName(roomTheme)), 5f);
-                        // Male announcer reveals the game AND the room ("Game three. Tug of war.
-                        // Welcome to Neon District."), the spoken clips matching the caption.
+                                + "  " + Loc.Get("gm.room_intro", ArenaThemes.DisplayName(roomTheme)), 7f);
+                        // Male announcer: the ceremonial PA reveal ("Attention, players. Game three.
+                        // Tug of war. The arena, Neon District."), the spoken clips matching the caption.
                         Announcer.Game(_router.RoundIndex + 1, _router.CurrentGame.Value, _router.IsFinalGame, roomTheme);
                     }
                     break;
@@ -659,28 +662,25 @@ namespace Eliminated.Game.UI
                 Caption(Loc.Get("gm.eliminated_one", _router.NameOf(outNow[0])), 2.4f);
             else
                 Caption(Loc.Get("gm.eliminated_many", outNow.Count), 2.4f);
-            // Female announcer calls the player out BY NUMBER ("Player N has been
-            // eliminated."), so the tag shown over their head — and on your HUD — is the
-            // one you hear. Your own death takes priority and is named; a single other is
-            // named too; a simultaneous wipe can't name everyone, so it's summarized.
-            // Throttled so a fast string of deaths doesn't keep cutting its own line short.
-            if (localOut)
+            // Female announcer calls the fallen out BY NUMBER — the tag over their head and
+            // on your HUD is the one you hear. One out → "Player N has been eliminated."; a
+            // same-tick wipe enumerates them → "Players 1, 2, 3, 4 … have been eliminated."
+            // Your own death jumps the throttle queue; otherwise deaths are spaced so a line
+            // isn't chopped, and the spacing scales with how many names the line reads.
+            if (localOut || Time.time >= _elimVoiceUntil)
             {
-                Announcer.EliminatedByNumber(NumberInSnap(snap, localOutId));
-                _elimVoiceUntil = Time.time + 2.6f;
-            }
-            else if (outNow.Count == 1)
-            {
-                if (Time.time >= _elimVoiceUntil)
+                if (outNow.Count == 1)
                 {
                     Announcer.EliminatedByNumber(NumberInSnap(snap, outNow[0]));
-                    _elimVoiceUntil = Time.time + 1.9f;
+                    _elimVoiceUntil = Time.time + (localOut ? 2.6f : 1.9f);
                 }
-            }
-            else if (Time.time >= _elimVoiceUntil)
-            {
-                Announcer.EliminatedMany();
-                _elimVoiceUntil = Time.time + 1.4f;
+                else
+                {
+                    var nums = new List<int>(outNow.Count);
+                    foreach (var id in outNow) nums.Add(NumberInSnap(snap, id));
+                    Announcer.EliminatedMultiple(nums);
+                    _elimVoiceUntil = Time.time + 1.6f + nums.Count * 1.2f;
+                }
             }
         }
 
@@ -779,6 +779,7 @@ namespace Eliminated.Game.UI
                         case Page.PatchNotes: _patchScroll = Vector2.zero; break;
                         case Page.Credits: _creditsScroll = Vector2.zero; break;
                         case Page.Players: _playerScroll = Vector2.zero; break;
+                        case Page.Settings: _setScroll = Vector2.zero; break;
                         // Re-seed the editable name field from the saved profile on
                         // every entry, so the text box always shows the current name
                         // (the lazy `== null` init below only ever fires once and can
@@ -2051,6 +2052,7 @@ namespace Eliminated.Game.UI
             Lbl(new Rect(20, 44, 336, 22), Loc.Get("hud.players_alive", alive), _body);
 
             DrawYourNumber(snap);
+            DrawActivePowerups(snap);
 
             if (!_router.HasSeries) return;
             if (!_router.PlayStarted)
@@ -2074,6 +2076,74 @@ namespace Eliminated.Game.UI
             Lbl(new Rect(20, 84, 130, 24), Loc.Get("hud.you_are", myNum),
                 new GUIStyle(_body) { fontSize = 16, fontStyle = FontStyle.Bold, normal = { textColor = Yellow } });
         }
+
+        private GUIStyle _puIcon;
+
+        // Boomerang-Fu-style active-effect strip: the powerups you're carrying right
+        // now, as icon chips under your tag, so it's always clear what you've got.
+        // BLESSINGS show a steady green bar (they stay with you); CURSES show a
+        // draining red bar so you can see exactly when the affliction wears off.
+        // Reads the local player's live status straight off the snapshot.
+        // NOTE: in-process play only (solo / local co-op). Online's compact NetActor
+        // wire format (Net/Wire.cs) doesn't carry the Pu* timers, so this strip stays
+        // empty for a networked client — the pickup REVEAL still fires online (effects
+        // are serialized), just not this persistent strip. Extend the wire for parity.
+        private void DrawActivePowerups(Snapshot snap)
+        {
+            var locals = _router.LocalPlayerIds;
+            if (locals == null || locals.Count == 0 || snap?.Actors == null) return;
+            string myId = locals[0];
+            Actor me = null;
+            foreach (var a in snap.Actors) if (a.Id == myId) { me = a; break; }
+            if (me == null || !me.Alive) return;
+
+            var fx = new List<(string icon, float frac, bool held)>();
+            // Shared blessings (held) + curses (draining).
+            AddHeld(fx, me.Shield, "Shield");
+            AddHeld(fx, me.PuSpeedT > 0f, "Speed");
+            AddHeld(fx, me.PuTinyT > 0f, "Tiny");
+            AddHeld(fx, me.PuVisionT > 0f, "Vision");
+            AddHeld(fx, me.PuCaffeineT > 0f, "Caffeine");
+            AddHeld(fx, me.PuDisguiseT > 0f || !string.IsNullOrEmpty(me.DisguiseCharId), "Disguise");
+            AddTimed(fx, me.PuReverseT, PowerupEffects.ReverseDuration, "Reverse");
+            AddTimed(fx, me.PuSlowT, PowerupEffects.SlowDuration, "Slow");
+            AddTimed(fx, me.PuGiantT, PowerupEffects.GiantDuration, "Giant");
+            AddTimed(fx, me.PuDizzyT, PowerupEffects.DizzyDuration, "Dizzy");
+            AddTimed(fx, me.PuSlipperyT, PowerupEffects.SlipperyDuration, "Slippery");
+            // Boomerang's own combat drops (its per-actor scratch timers).
+            if (snap.Data is Boomerang.BoomData)
+            {
+                AddTimed(fx, me.Get("speedT"), 8f, "Speed");
+                AddTimed(fx, me.Get("bigT"), 10f, "BigRang");
+                AddTimed(fx, me.Get("multiT"), 10f, "Multishot");
+                AddTimed(fx, me.Get("magnetT"), 10f, "Magnet");
+                AddTimed(fx, me.Get("tinyT"), 10f, "Tiny");
+            }
+            if (fx.Count == 0) return;
+
+            if (_puIcon == null)
+                _puIcon = new GUIStyle(_body) { alignment = TextAnchor.MiddleCenter, fontSize = 22, fontStyle = FontStyle.Bold, wordWrap = false, normal = { textColor = Ink } };
+
+            const float sz = 42f, gap = 6f;
+            float x = 14f, y = 118f;
+            var curse = new Color(1f, 0.40f, 0.42f);
+            foreach (var e in fx)
+            {
+                var box = new Rect(x, y, sz, sz);
+                Fill(box, new Color(0f, 0f, 0f, 0.55f), 9f);
+                Lbl(new Rect(box.x, box.y - 1f, sz, sz - 5f), e.icon, _puIcon);
+                var track = new Rect(box.x + 5f, box.yMax - 8f, sz - 10f, 4f);
+                Fill(track, new Color(1f, 1f, 1f, 0.16f), 2f);
+                Fill(new Rect(track.x, track.y, track.width * e.frac, track.height), e.held ? Green : curse, 2f);
+                x += sz + gap;
+            }
+        }
+
+        private static void AddHeld(List<(string icon, float frac, bool held)> fx, bool on, string key)
+        { if (on && PowerupCatalog.TryGet(key, out var m)) fx.Add((m.Icon, 1f, true)); }
+
+        private static void AddTimed(List<(string icon, float frac, bool held)> fx, float t, float max, string key)
+        { if (t > 0f && PowerupCatalog.TryGet(key, out var m)) fx.Add((m.Icon, Mathf.Clamp01(t / max), false)); }
 
         private void DrawControlsHint(GameId? game, float w, float h)
         {
@@ -2426,31 +2496,8 @@ namespace Eliminated.Game.UI
                 }
                 case ChutesAndLadders.ChutesData chutes:
                 {
-                    Info(w, Loc.Get("hud.race_top"), $"REACH {chutes.Goal} · {chutes.TimeLeft:0}s");
                     string clId = (_router.LocalPlayerIds != null && _router.LocalPlayerIds.Count > 0) ? _router.LocalPlayerIds[0] : null;
-                    bool haveMe = false; ChutesAndLadders.ClimberView me = default;
-                    if (clId != null && chutes.Climbers != null)
-                        foreach (var cv in chutes.Climbers) if (cv.Id == clId) { me = cv; haveMe = true; break; }
-                    if (haveMe && me.Alive && !me.Finished)
-                    {
-                        if (me.Choosing >= 0) // FORK: pick a side (reveal known outcomes), roll hidden
-                        {
-                            int lo = -1, ro = -1;
-                            if (chutes.Chutes != null) foreach (var cw in chutes.Chutes) if (cw.Id == me.Choosing) { lo = cw.Left; ro = cw.Right; break; }
-                            GUI.Box(new Rect(w / 2f - 215f, h - 172f, 430f, 28f), "FORK — one side sends you BACK, one is the ABYSS:", _pill);
-                            string lLbl = lo == 1 ? "◄ ABYSS" : lo == 0 ? "◄ BACK TO START" : "◄ LEFT";
-                            string rLbl = ro == 1 ? "ABYSS ►" : ro == 0 ? "BACK TO START ►" : "RIGHT ►";
-                            if (Btn(new Rect(w / 2f - 206f, h - 138f, 200f, 58f), lLbl, Teal, OnDark, true, 18)) _router.SubmitFor(clId, GameInput.Choose("L"));
-                            if (Btn(new Rect(w / 2f + 6f, h - 138f, 200f, 58f), rLbl, Pink, OnDark, true, 18)) _router.SubmitFor(clId, GameInput.Choose("R"));
-                        }
-                        else // DIE: show the last roll, else a tap-to-roll button
-                        {
-                            var dieR = new Rect(w / 2f - 36f, h - 156f, 72f, 72f);
-                            if (me.Die > 0) { Fill(dieR, new Color(0.95f, 0.95f, 0.97f), 10f); DrawDiePips(dieR, me.Die); }
-                            else if (Btn(new Rect(w / 2f - 84f, h - 152f, 168f, 60f), "ROLL  (Space)", Yellow, OnGold, true, 22))
-                                _router.SubmitFor(clId, GameInput.Tap());
-                        }
-                    }
+                    DrawChutesBoard(snap, chutes, clId, w, h); // a big, numbered 2D board (the 3D arena can't show numbers)
                     break;
                 }
                 case PresentSwap.PresentData present:
@@ -2565,6 +2612,244 @@ namespace Eliminated.Game.UI
                 case "jump": return "Space";
                 default: return cmd?.ToUpper() ?? "?";
             }
+        }
+
+        // ── Chutes & Ladders: a full 2D board overlay ───────────────────────
+        // Rendered in the HUD (NOT the tilted 3D arena, which can't show square NUMBERS and let the
+        // neon floor bleed through) — a big numbered serpentine grid on a clean dark panel, with
+        // real ladders, chute-forks, pawns clustered per square, a timer bar, and the dice/roll/fork
+        // controls in a side column. Covers the arena entirely so it reads as a proper board game.
+        private void DrawChutesBoard(Snapshot snap, ChutesAndLadders.ChutesData ch, string clId, float w, float h)
+        {
+            int cols = Mathf.Max(1, ch.Cols);
+            int rows = Mathf.Max(1, (ch.Goal + cols - 1) / cols);
+
+            // Full-screen dark backdrop (hides the clashing arena floor + 3D blobs).
+            Fill(new Rect(0, 0, w, h), new Color(0.09f, 0.05f, 0.15f, 1f), 0f);
+            Fill(new Rect(0, 0, w, h * 0.6f), new Color(0.16f, 0.09f, 0.26f, 0.5f), 0f); // soft top glow
+
+            // Board geometry: as large as fits, left-aligned, a control column on the right.
+            const float ctrlW = 300f;
+            float boardSize = Mathf.Clamp(Mathf.Min(h - 96f, w - ctrlW - 80f), 240f, 720f);
+            float bx = 44f, by = Mathf.Max((h - boardSize) * 0.5f + 6f, 74f); // keep clear of the top header
+            float cw = boardSize / cols, chh = boardSize / rows;
+            float ctrlX = bx + boardSize + 34f;
+
+            Vector2 Cell(int sq)
+            {
+                if (sq <= 0) return new Vector2(bx + cw * 0.5f, by + boardSize + chh * 0.55f);
+                int s0 = Mathf.Min(sq, ch.Goal) - 1;
+                int r = s0 / cols, within = s0 % cols;
+                int col = (r % 2 == 0) ? within : cols - 1 - within; // serpentine
+                return new Vector2(bx + col * cw + cw * 0.5f, by + (rows - 1 - r) * chh + chh * 0.5f);
+            }
+
+            // Board panel + frame.
+            Fill(new Rect(bx - 10f, by - 10f, boardSize + 20f, boardSize + 20f), new Color(0.16f, 0.10f, 0.26f), 12f);
+            // Numbered checker cells.
+            int numFont = Mathf.Max(9, (int)(cw * 0.24f));
+            for (int s = 1; s <= ch.Goal; s++)
+            {
+                Vector2 c = Cell(s);
+                int s0 = s - 1, r = s0 / cols, within = s0 % cols;
+                int col = (r % 2 == 0) ? within : cols - 1 - within;
+                bool checker = (r + col) % 2 == 0;
+                bool goal = s == ch.Goal;
+                var cr = new Rect(c.x - cw * 0.5f + 1.5f, c.y - chh * 0.5f + 1.5f, cw - 3f, chh - 3f);
+                Fill(cr, goal ? new Color(0.30f, 0.92f, 0.55f, 0.30f) : new Color(1f, 1f, 1f, checker ? 0.075f : 0.03f), 4f);
+                Lbl(new Rect(c.x - cw * 0.5f + 5f, c.y - chh * 0.5f + 3f, cw, numFont + 6f), goal ? $"GOAL {ch.Goal}" : s.ToString(),
+                    new GUIStyle(_body) { fontSize = numFont, alignment = TextAnchor.UpperLeft, normal = { textColor = goal ? Green : new Color(0.80f, 0.74f, 0.92f, 0.55f) } });
+            }
+            Stroke(new Rect(bx, by, boardSize, boardSize), new Color(1f, 1f, 1f, 0.22f), 2.5f, 6f);
+
+            // Ladders (climb up).
+            if (ch.Ladders != null)
+                foreach (var l in ch.Ladders) DrawLadder2D(Cell(l[0]), Cell(l[1]), Mathf.Min(cw, chh));
+            // Chute forks (one neighbour resets you, one is the abyss).
+            if (ch.Chutes != null)
+                foreach (var cv in ch.Chutes)
+                    DrawChuteFork2D(Cell(cv.Square), Cell(Mathf.Max(1, cv.Square - 1)), Cell(Mathf.Min(ch.Goal, cv.Square + 1)), cv.Left, cv.Right, Mathf.Min(cw, chh));
+
+            // The Squid Game doll (same caller as Red-Light / Simon) presides over the FINISH —
+            // reach her square or be eliminated. We draw the REAL 3D model via an offscreen render
+            // (DollPortrait); if that's unavailable she falls back to a procedural drawing. Bobs so
+            // she feels alive and watching.
+            {
+                Vector2 g = Cell(ch.Goal);
+                float unit = Mathf.Min(cw, chh);
+                float bob = Mathf.Sin(Time.time * 2.4f) * unit * 0.05f;
+                Texture dollTex = DollPortrait.Texture;
+                if (dollTex != null)
+                {
+                    float dw = unit * 1.05f, dh = unit * 1.45f;
+                    GUI.DrawTexture(new Rect(g.x - dw * 0.5f, g.y - dh * 0.58f + bob, dw, dh), dollTex, ScaleMode.ScaleToFit, true);
+                }
+                else DrawDoll2D(g.x, g.y - unit * 0.08f + bob, unit * 1.18f);
+            }
+
+            // Pawns, clustered per square so a crowd doesn't fully stack.
+            float pawnR = Mathf.Max(8f, Mathf.Min(cw, chh) * 0.26f);
+            var bySquare = new Dictionary<int, List<ChutesAndLadders.ClimberView>>();
+            if (ch.Climbers != null)
+                foreach (var cvw in ch.Climbers)
+                {
+                    int key = cvw.Alive ? cvw.Square : -1000 - cvw.Square;
+                    if (!bySquare.TryGetValue(key, out var lst)) { lst = new List<ChutesAndLadders.ClimberView>(); bySquare[key] = lst; }
+                    lst.Add(cvw);
+                }
+            foreach (var grp in bySquare.Values)
+                for (int i = 0; i < grp.Count; i++)
+                {
+                    var cvw = grp[i];
+                    Vector2 c = Cell(cvw.Square);
+                    if (grp.Count > 1)
+                    {
+                        float ang = (i / (float)grp.Count) * 6.2831853f, rad = pawnR * (grp.Count > 4 ? 1.5f : 1.1f);
+                        c += new Vector2(Mathf.Cos(ang) * rad, Mathf.Sin(ang) * rad);
+                    }
+                    bool isMe = cvw.Id == clId;
+                    Color body = PawnColor(snap, cvw.Id);
+                    if (!cvw.Alive) body = new Color(body.r * 0.4f, body.g * 0.4f, body.b * 0.4f, 0.6f);
+                    var pr = new Rect(c.x - pawnR, c.y - pawnR, pawnR * 2f, pawnR * 2f);
+                    Fill(new Rect(pr.x + 2f, pr.y + 3f, pr.width, pr.height), new Color(0f, 0f, 0f, 0.35f), pawnR); // shadow
+                    if (isMe) Stroke(new Rect(pr.x - 3f, pr.y - 3f, pr.width + 6f, pr.height + 6f), Yellow, 3f, pawnR + 3f);
+                    Fill(pr, body, pawnR);
+                    Stroke(pr, new Color(1f, 1f, 1f, 0.5f), 1.5f, pawnR);
+                    if (cvw.Finished) Lbl(pr, "✓", new GUIStyle(_ui) { fontSize = (int)(pawnR * 1.1f), alignment = TextAnchor.MiddleCenter, normal = { textColor = Green } });
+                }
+
+            // Header (round + alive) — re-drawn since our backdrop covers the default top box.
+            int aliveN = snap?.Actors?.Count(a => a.Alive) ?? 0;
+            Lbl(new Rect(20, 14, 360, 24), Loc.Get("hud.round_game", _router.RoundIndex + 1, GameName(GameId.ChutesAndLadders)),
+                new GUIStyle(_body) { fontSize = 17, fontStyle = FontStyle.Bold, normal = { textColor = Ink } });
+            Lbl(new Rect(20, 40, 360, 22), Loc.Get("hud.players_alive", aliveN), _body);
+
+            // ── Control column: a prominent timer, then dice + ROLL, or the FORK picker ──
+            float frac = ch.Duration > 0f ? Mathf.Clamp01(ch.TimeLeft / ch.Duration) : 0f;
+            Color tcol = ch.TimeLeft <= 5f ? new Color(1f, 0.3f, 0.42f) : ch.TimeLeft <= 12f ? Yellow : Green;
+            Lbl(new Rect(ctrlX, by, ctrlW - 30f, 26f), $"RACE TO {ch.Goal}  ·  {Mathf.CeilToInt(ch.TimeLeft)}s",
+                new GUIStyle(_ui) { fontSize = 19, alignment = TextAnchor.MiddleCenter, normal = { textColor = tcol } });
+            Fill(new Rect(ctrlX, by + 28f, ctrlW - 30f, 8f), new Color(1f, 1f, 1f, 0.12f), 4f);
+            Fill(new Rect(ctrlX, by + 28f, (ctrlW - 30f) * frac, 8f), tcol, 4f);
+
+            ChutesAndLadders.ClimberView me = default; bool haveMe = false;
+            if (clId != null && ch.Climbers != null)
+                foreach (var cvw in ch.Climbers) if (cvw.Id == clId) { me = cvw; haveMe = true; break; }
+            float colCx = ctrlX + (ctrlW - 30f) * 0.5f, cy = by + 92f;
+            Lbl(new Rect(ctrlX, cy - 30f, ctrlW - 30f, 24f), me.Choosing >= 0 ? "PICK A FORK!" : "ROLL TO CLIMB", new GUIStyle(_ui) { fontSize = 18, alignment = TextAnchor.MiddleCenter, normal = { textColor = Yellow } });
+            if (haveMe && me.Alive && !me.Finished)
+            {
+                if (me.Choosing >= 0)
+                {
+                    int lo = -1, ro = -1;
+                    if (ch.Chutes != null) foreach (var cw2 in ch.Chutes) if (cw2.Id == me.Choosing) { lo = cw2.Left; ro = cw2.Right; break; }
+                    GUI.Box(new Rect(ctrlX, cy, ctrlW - 30f, 30f), "FORK — one side resets you, one is the ABYSS", _pill);
+                    string lLbl = lo == 1 ? "▲ ABYSS" : lo == 0 ? "▲ BACK TO START" : "▲ LEFT";
+                    string rLbl = ro == 1 ? "▼ ABYSS" : ro == 0 ? "▼ BACK TO START" : "▼ RIGHT";
+                    if (Btn(new Rect(ctrlX, cy + 40f, ctrlW - 30f, 56f), lLbl, Teal, OnDark, true, 18)) _router.SubmitFor(clId, GameInput.Choose("L"));
+                    if (Btn(new Rect(ctrlX, cy + 104f, ctrlW - 30f, 56f), rLbl, Pink, OnDark, true, 18)) _router.SubmitFor(clId, GameInput.Choose("R"));
+                }
+                else
+                {
+                    var dieR = new Rect(colCx - 44f, cy + 4f, 88f, 88f);
+                    Fill(dieR, new Color(0.95f, 0.95f, 0.97f), 12f);
+                    if (me.Die > 0) DrawDiePips(dieR, me.Die);
+                    else Lbl(dieR, "?", new GUIStyle(_h1) { fontSize = 50, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.6f, 0.6f, 0.7f) } });
+                    if (Btn(new Rect(ctrlX, cy + 108f, ctrlW - 30f, 60f), "ROLL  (Space)", Yellow, OnGold, true, 22)) _router.SubmitFor(clId, GameInput.Tap());
+                    Lbl(new Rect(ctrlX, cy + 174f, ctrlW - 30f, 22f), me.Die > 0 ? $"rolled {me.Die} — climbing…" : "tap to roll the die",
+                        new GUIStyle(_body) { fontSize = 14, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.8f, 0.78f, 0.9f) } });
+                }
+            }
+            else if (haveMe && me.Finished)
+                Lbl(new Rect(ctrlX, cy + 30f, ctrlW - 30f, 30f), "SAFE — you made it!", new GUIStyle(_ui) { fontSize = 20, alignment = TextAnchor.MiddleCenter, normal = { textColor = Green } });
+
+            // legend
+            float ly = by + boardSize - 84f;
+            Lbl(new Rect(ctrlX, ly, ctrlW - 30f, 22f), "▮ ladder — climb up", new GUIStyle(_body) { fontSize = 14, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.86f, 0.66f, 0.38f) } });
+            Lbl(new Rect(ctrlX, ly + 24f, ctrlW - 30f, 22f), "▮ fork — gamble: reset or abyss", new GUIStyle(_body) { fontSize = 14, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.69f, 0.42f, 0.90f) } });
+            Lbl(new Rect(ctrlX, ly + 48f, ctrlW - 30f, 22f), "● = a racer   ◉ gold = YOU", new GUIStyle(_body) { fontSize = 14, alignment = TextAnchor.MiddleLeft, normal = { textColor = new Color(0.85f, 0.85f, 0.95f) } });
+
+            // Keep the pre-round GO countdown legible on top of our takeover.
+            if (!_router.PlayStarted)
+                OutlineLbl(new Rect(0, h * 0.42f, w, 60), Loc.Get("hud.countdown"), _h1, 3f, 6f);
+        }
+
+        // A thick 2D line between two screen points (rotated rounded bar).
+        private void Line2D(Vector2 a, Vector2 b, float thick, Color c, float radius = 0f)
+        {
+            Vector2 mid = (a + b) * 0.5f; float len = Vector2.Distance(a, b);
+            if (len < 0.5f) return;
+            float ang = Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg;
+            var m = GUI.matrix;
+            GUIUtility.RotateAroundPivot(ang, mid);
+            Fill(new Rect(mid.x - len * 0.5f, mid.y - thick * 0.5f, len, thick), c, radius);
+            GUI.matrix = m;
+        }
+
+        // A wooden ladder: two rails + rungs, with an up-arrow head at the top (the 'to' end).
+        private void DrawLadder2D(Vector2 a, Vector2 b, float cell)
+        {
+            Vector2 dir = (b - a); float len = dir.magnitude; if (len < 1f) return; dir /= len;
+            Vector2 perp = new Vector2(-dir.y, dir.x) * Mathf.Clamp(cell * 0.17f, 5f, 15f);
+            var rail = new Color(0.86f, 0.66f, 0.38f); var rung = new Color(0.72f, 0.50f, 0.26f);
+            Line2D(a + perp, b + perp, 4f, rail, 2f);
+            Line2D(a - perp, b - perp, 4f, rail, 2f);
+            int n = Mathf.Clamp(Mathf.RoundToInt(len / 22f), 2, 14);
+            for (int i = 1; i < n; i++) { Vector2 p = Vector2.Lerp(a, b, i / (float)n); Line2D(p + perp, p - perp, 3f, rung, 1.5f); }
+        }
+
+        // A chute fork: a hazard mouth on the chute square, slide-arms to the two neighbour squares,
+        // tinted by outcome (red = abyss, cyan = back-to-start, purple = unknown).
+        private void DrawChuteFork2D(Vector2 from, Vector2 left, Vector2 right, int lo, int ro, float cell)
+        {
+            Color C(int o) => o == 1 ? new Color(1f, 0.30f, 0.43f) : o == 0 ? new Color(0.15f, 0.78f, 0.86f) : new Color(0.69f, 0.42f, 0.90f);
+            Line2D(from, left, 6f, C(lo), 3f);
+            Line2D(from, right, 6f, C(ro), 3f);
+            float hr = Mathf.Max(7f, cell * 0.30f);
+            Fill(new Rect(from.x - hr, from.y - hr, hr * 2f, hr * 2f), new Color(0.49f, 0.25f, 0.72f, 0.55f), hr);
+            float er = Mathf.Max(5f, cell * 0.16f);
+            Fill(new Rect(left.x - er, left.y - er, er * 2f, er * 2f), C(lo), er);
+            Fill(new Rect(right.x - er, right.y - er, er * 2f, er * 2f), C(ro), er);
+        }
+
+        // The Squid Game doll ("Younghee"), drawn flat for the 2D Chutes board's finish square —
+        // orange pinafore, pale round head, bowl-cut bangs, two ribboned pigtails, red scanning eyes.
+        // (cx,cy) is the doll's centre; s is its overall size (~one board cell).
+        private void DrawDoll2D(float cx, float cy, float s)
+        {
+            var dress  = new Color(0.96f, 0.55f, 0.20f);
+            var shirt  = new Color(0.96f, 0.82f, 0.34f);
+            var skin   = new Color(1f, 0.86f, 0.70f);
+            var hair   = new Color(0.18f, 0.12f, 0.10f);
+            var ribbon = new Color(0.86f, 0.18f, 0.30f);
+            var eye    = new Color(1f, 0.12f, 0.24f);
+
+            float headR = s * 0.27f;
+            float hy = cy - s * 0.14f;             // head centre (above the body)
+            void Disc(float x, float y, float r, Color c) => Fill(new Rect(x - r, y - r, r * 2f, r * 2f), c, r);
+
+            Fill(new Rect(cx - s * 0.37f, hy + headR * 0.45f, s * 0.74f, s * 0.58f), dress, s * 0.16f); // pinafore skirt
+            Fill(new Rect(cx - s * 0.17f, hy + headR * 0.25f, s * 0.34f, s * 0.24f), shirt, s * 0.06f);  // collar
+            Disc(cx, hy - headR * 0.18f, headR * 1.12f, hair);                                 // hair mass behind
+            Disc(cx, hy, headR, skin);                                                         // head
+            float pr = s * 0.115f;
+            Disc(cx - headR * 0.96f, hy + pr * 0.2f, pr, hair);                                // left pigtail
+            Disc(cx + headR * 0.96f, hy + pr * 0.2f, pr, hair);                                // right pigtail
+            Disc(cx - headR * 0.96f, hy + pr * 1.05f, pr * 0.5f, ribbon);                      // ribbons
+            Disc(cx + headR * 0.96f, hy + pr * 1.05f, pr * 0.5f, ribbon);
+            Fill(new Rect(cx - headR * 0.86f, hy - headR * 0.92f, headR * 1.72f, headR * 0.66f), hair, headR * 0.24f); // bangs
+            float er = s * 0.045f;
+            Disc(cx - s * 0.10f, hy + s * 0.02f, er, eye);                                     // red scanning eyes
+            Disc(cx + s * 0.10f, hy + s * 0.02f, er, eye);
+            Fill(new Rect(cx - s * 0.045f, hy + headR * 0.5f, s * 0.09f, s * 0.03f), new Color(0.82f, 0.34f, 0.32f), s * 0.015f); // mouth
+        }
+
+        // A climber's body colour from the snapshot's character (for board pawns).
+        private static Color PawnColor(Snapshot snap, string id)
+        {
+            if (snap?.Actors != null)
+                foreach (var a in snap.Actors) if (a.Id == id) return Palette.Body(a.CharacterId);
+            return new Color(0.7f, 0.7f, 0.8f);
         }
 
         // Pip layouts for a die face 1..6 (offsets in {-1,0,1} grid units), mirroring the
@@ -2685,15 +2970,16 @@ namespace Eliminated.Game.UI
                 return;
             }
             float panelW = 560f;
-            // 0.135 top keeps clear of the title; 0.84 tall fits the audio block (Master +
-            // Game Sound + Background Music sliders, music + captions toggles) down to ~720p.
+            // Fixed panel; the body scrolls and Save & Back is pinned to the floor, so the
+            // content can never spill past the rounded border no matter how many rows there
+            // are or how short the window (it used to overflow on ~720p and below).
             var panelR = new Rect(w * 0.5f - panelW * 0.5f, h * 0.135f, panelW, h * 0.84f);
             Fill(panelR, Panel, 24f);
             Stroke(panelR, Line, 2f, 24f);
             Lbl(new Rect(0, h * 0.05f, w, 48), Loc.Get("ui.settings"), _h1);
 
-            // Quick-close X in the panel corner — saves and returns to the menu, same as
-            // "Save & Back" below (settings apply live, so closing always persists).
+            // Quick-close X (pinned top-right) — saves and returns to the menu, same as
+            // "Save & Back" (settings apply live, so closing always persists).
             if (Pill(new Rect(panelR.xMax - 46f, panelR.y + 12f, 34f, 34f), "✕"))
             {
                 SaveService.Save();
@@ -2701,15 +2987,17 @@ namespace Eliminated.Game.UI
                 return;
             }
 
-            // Every row's width comes from cw (= panel width minus a fixed padding), so
-            // nothing can spill past the rounded border. Grouped by sensory channel:
-            // Language · VISUAL (colorblind sits right under language, then the motion-
-            // safety toggle) · AUDIO (volume → music → captions, since captions
-            // transcribe audio) · actions.
             float pad = 30f;
-            float cx = panelR.x + pad;
-            float cw = panelR.width - pad * 2f;
-            float y = panelR.y + 22f;
+            // Save & Back pinned to the panel floor (always reachable); everything else
+            // lives in the scroll view above it.
+            var saveR = new Rect(panelR.x + pad, panelR.yMax - 60f, panelR.width - pad * 2f, 44f);
+            float viewTop = panelR.y + 50f; // clear of the X
+            var viewport = new Rect(panelR.x + pad, viewTop, panelR.width - pad * 2f, saveR.y - viewTop - 14f);
+
+            float cx = 0f, cw = viewport.width - 16f; // local coords; leave room for the scrollbar
+            float y = 0f;
+            _setScroll = GUI.BeginScrollView(viewport, _setScroll, new Rect(0, 0, cw, _setContentH), false, false);
+
             var grp = new GUIStyle(_body) { fontSize = 12, fontStyle = FontStyle.Bold, normal = { textColor = InkDim } };
             void Divider() { Fill(new Rect(cx, y, cw, 1f), Alpha(Line, 0.6f), 0f); y += 11f; }
 
@@ -2734,22 +3022,32 @@ namespace Eliminated.Game.UI
             y += 30; Divider();
 
             // ── Audio ──
-            // Three independent levels: Master (everything) · Game Sound (SFX + the
-            // announcer + in-game music) · Background Music (menu/lobby loops only). The
-            // Music toggle is the all-music on/off switch.
+            // Master is the overall ceiling; Game Sound (SFX + announcer + in-game music)
+            // and Background Music (menu/lobby loops) are capped at it for both the readout
+            // and playback, so a channel can never read or sound louder than Master — no
+            // more "100% sitting under 50%". Stored values are preserved (master is a live
+            // ceiling), so raising Master back reveals a channel's original level.
             Lbl(new Rect(cx, y, cw, 16), Loc.Get("set.grp_audio"), grp); y += 18;
             Lbl(new Rect(cx, y, cw, 22), Loc.Get("set.master_volume", Mathf.RoundToInt(s.masterVolume * 100f)), _body); y += 22;
-            s.masterVolume = GUI.HorizontalSlider(new Rect(cx, y, cw, 22), s.masterVolume, 0f, 1f);
+            float newMaster = GUI.HorizontalSlider(new Rect(cx, y, cw, 22), s.masterVolume, 0f, 1f);
+            if (!Mathf.Approximately(newMaster, s.masterVolume)) { s.masterVolume = newMaster; AudioService.Instance?.ApplyVolumes(); }
             AudioListener.volume = s.masterVolume; y += 30;
 
-            Lbl(new Rect(cx, y, cw, 22), Loc.Get("set.game_volume", Mathf.RoundToInt(s.sfxVolume * 100f)), _body); y += 22;
-            float newSfx = GUI.HorizontalSlider(new Rect(cx, y, cw, 22), s.sfxVolume, 0f, 1f);
-            if (!Mathf.Approximately(newSfx, s.sfxVolume)) { s.sfxVolume = newSfx; AudioService.Instance?.ApplyVolumes(); }
+            // All three sliders share the same 0..1 track so their knobs line up on one
+            // scale: a 50% knob sits at the 50% mark on every row, and "20%" sits at the
+            // real 20% mark. Game Sound / Background Music show min(channel, master), so
+            // their knob can never sit right of Master's — dragging one past Master just
+            // sticks it at Master's position.
+            float shownSfx = Mathf.Min(s.sfxVolume, s.masterVolume);
+            Lbl(new Rect(cx, y, cw, 22), Loc.Get("set.game_volume", Mathf.RoundToInt(shownSfx * 100f)), _body); y += 22;
+            float rawSfx = GUI.HorizontalSlider(new Rect(cx, y, cw, 22), shownSfx, 0f, 1f);
+            if (!Mathf.Approximately(rawSfx, shownSfx)) { s.sfxVolume = Mathf.Min(rawSfx, s.masterVolume); AudioService.Instance?.ApplyVolumes(); }
             y += 30;
 
-            Lbl(new Rect(cx, y, cw, 22), Loc.Get("set.music_volume", Mathf.RoundToInt(s.musicVolume * 100f)), _body); y += 22;
-            float newMus = GUI.HorizontalSlider(new Rect(cx, y, cw, 22), s.musicVolume, 0f, 1f);
-            if (!Mathf.Approximately(newMus, s.musicVolume)) { s.musicVolume = newMus; AudioService.Instance?.ApplyVolumes(); }
+            float shownMus = Mathf.Min(s.musicVolume, s.masterVolume);
+            Lbl(new Rect(cx, y, cw, 22), Loc.Get("set.music_volume", Mathf.RoundToInt(shownMus * 100f)), _body); y += 22;
+            float rawMus = GUI.HorizontalSlider(new Rect(cx, y, cw, 22), shownMus, 0f, 1f);
+            if (!Mathf.Approximately(rawMus, shownMus)) { s.musicVolume = Mathf.Min(rawMus, s.masterVolume); AudioService.Instance?.ApplyVolumes(); }
             y += 30;
 
             bool musicOn = GUI.Toggle(new Rect(cx, y, cw, 24), s.musicEnabled, "  " + Loc.Get("set.music"));
@@ -2758,14 +3056,18 @@ namespace Eliminated.Game.UI
             s.subtitles = GUI.Toggle(new Rect(cx, y, cw, 24), s.subtitles, "  " + Loc.Get("set.subtitles"));
             y += 32; Divider();
 
-            // ── Actions: Remap + Credits share a row; Save spans full width ──
+            // ── Remap + Credits (scroll with the body; Save is pinned below) ──
             // Credits opens a dedicated scrollable page (DrawCredits) — the CC-BY
             // attribution is too long for a clipped label here.
             float halfW = (cw - 12f) * 0.5f;
             if (GhostBtn(new Rect(cx, y, halfW, 40f), "🎮  " + Loc.Get("set.remap"))) { SaveService.Save(); _page = Page.Controls; }
             if (GhostBtn(new Rect(cx + halfW + 12f, y, halfW, 40f), "📜  " + Loc.Get("set.credits"))) { SaveService.Save(); _page = Page.Credits; }
-            y += 48;
-            if (Btn(new Rect(cx, y, cw, 44f), Loc.Get("ui.save_and_back"), Pink, OnDark))
+            y += 44;
+
+            _setContentH = y; // feed this frame's measured height into next frame's scroll bounds
+            GUI.EndScrollView();
+
+            if (Btn(saveR, Loc.Get("ui.save_and_back"), Pink, OnDark))
             {
                 SaveService.Save();
                 _page = Page.Menu;

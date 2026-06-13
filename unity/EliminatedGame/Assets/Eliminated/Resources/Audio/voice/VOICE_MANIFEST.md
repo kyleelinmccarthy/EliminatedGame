@@ -29,6 +29,7 @@ license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>
 - `game_19.wav` — [M] “Game nineteen.”
 - `game_20.wav` — [M] “Game twenty.”
 - `final_game.wav` — [M] “The final game.”
+- `attention.wav` — [M] “Attention, players.”
 - `name_redlight.wav` — [M] “Red light, green light.”
 - `name_tag.wav` — [M] “Freeze tag.”
 - `name_mingle.wav` — [M] “Mingle.”
@@ -45,12 +46,12 @@ license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>
 - `name_simonsays.wav` — [M] “Simon says.”
 - `name_keepyuppy.wav` — [M] “Keepy uppy.”
 - `name_koth.wav` — [M] “King of the lava islands.”
-- `room_courtyard.wav` — [M] “Welcome to The Courtyard.”
-- `room_neon.wav` — [M] “Welcome to Neon District.”
-- `room_candy.wav` — [M] “Welcome to Candy Kingdom.”
-- `room_toxic.wav` — [M] “Welcome to The Toxic Works.”
-- `room_beach.wav` — [M] “Welcome to Sunny Shores.”
-- `room_haunt.wav` — [M] “Welcome to Haunted Manor.”
+- `room_courtyard.wav` — [M] “The arena, The Courtyard.”
+- `room_neon.wav` — [M] “The arena, Neon District.”
+- `room_candy.wav` — [M] “The arena, Candy Kingdom.”
+- `room_toxic.wav` — [M] “The arena, The Toxic Works.”
+- `room_beach.wav` — [M] “The arena, Sunny Shores.”
+- `room_haunt.wav` — [M] “The arena, Haunted Manor.”
 - `simon_head.wav` — [M] “Simon says, pat your head.”
 - `simon_nose.wav` — [M] “Simon says, touch your nose.”
 - `simon_blink.wav` — [M] “Simon says, blink.”
@@ -90,3 +91,5 @@ license is inherited. Re-run: `dotnet run --project tools/VoiceGen -- <this-dir>
 - `num_90.wav` — [F] “ninety”
 - `num_hundred.wav` — [F] “hundred”
 - `num_elim.wav` — [F] “has been eliminated.”
+- `num_players.wav` — [F] “Players”
+- `num_elim_plural.wav` — [F] “have been eliminated.”

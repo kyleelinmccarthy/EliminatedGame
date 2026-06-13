@@ -21,7 +21,7 @@ namespace Eliminated.Tools.VoiceGen
         // chirpy. Mirrors the web's rate 0.85 / pitch 0.7-0.8 Game Master delivery.
         private const string MaleVoice = "en-us+m3";
         private const string FemaleVoice = "en-us+f3";
-        private const int MaleRate = 150, MalePitch = 32;     // wpm, 0..99
+        private const int MaleRate = 134, MalePitch = 32;     // wpm, 0..99 — slow, ceremonial PA
         private const int FemaleRate = 158, FemalePitch = 55;
 
         private enum V { Male, Female }
@@ -88,6 +88,10 @@ namespace Eliminated.Tools.VoiceGen
                 list.Add(new Spec($"game_{n:00}", $"Game {ones[n]}.", V.Male));
             list.Add(new Spec("final_game", "The final game.", V.Male));
 
+            // Ceremonial PA lead-in, spoken before every game reveal (Squid-Game-style):
+            // "Attention, players. Game four. Boomerang Brawl. The arena, The Courtyard."
+            list.Add(new Spec("attention", "Attention, players.", V.Male));
+
             // --- Male announcer: the 16 game names ----------------------------------
             // Spoken names match the web's display names (RPS uses its spokenName
             // override). Keys mirror Announcer.GameKey(GameId).
@@ -109,14 +113,15 @@ namespace Eliminated.Tools.VoiceGen
             list.Add(new Spec("name_koth", "King of the lava islands.", V.Male));
 
             // --- Male announcer: arena room reveals ---------------------------------
-            // "Welcome to <room>." played after the game name at the round intro. Keys
-            // mirror Announcer."room_" + theme and the Loc "room.<theme>" display names.
-            list.Add(new Spec("room_courtyard", "Welcome to The Courtyard.", V.Male));
-            list.Add(new Spec("room_neon", "Welcome to Neon District.", V.Male));
-            list.Add(new Spec("room_candy", "Welcome to Candy Kingdom.", V.Male));
-            list.Add(new Spec("room_toxic", "Welcome to The Toxic Works.", V.Male));
-            list.Add(new Spec("room_beach", "Welcome to Sunny Shores.", V.Male));
-            list.Add(new Spec("room_haunt", "Welcome to Haunted Manor.", V.Male));
+            // "The arena, <room>." played after the game name at the round intro (the
+            // ceremonial Squid-Game venue callout). Keys mirror Announcer."room_" + theme
+            // and the Loc "room.<theme>" display names.
+            list.Add(new Spec("room_courtyard", "The arena, The Courtyard.", V.Male));
+            list.Add(new Spec("room_neon", "The arena, Neon District.", V.Male));
+            list.Add(new Spec("room_candy", "The arena, Candy Kingdom.", V.Male));
+            list.Add(new Spec("room_toxic", "The arena, The Toxic Works.", V.Male));
+            list.Add(new Spec("room_beach", "The arena, Sunny Shores.", V.Male));
+            list.Add(new Spec("room_haunt", "The arena, Haunted Manor.", V.Male));
 
             // --- Male announcer: Simon Says orders ----------------------------------
             list.Add(new Spec("simon_head", "Simon says, pat your head.", V.Male));
@@ -146,6 +151,10 @@ namespace Eliminated.Tools.VoiceGen
                 list.Add(new Spec($"num_{t * 10}", tens[t], V.Female));
             list.Add(new Spec("num_hundred", "hundred", V.Female));
             list.Add(new Spec("num_elim", "has been eliminated.", V.Female));
+            // Plural form, for a same-tick wipe enumerated by number:
+            // "Players 1, 2, 3, 4 … have been eliminated."
+            list.Add(new Spec("num_players", "Players", V.Female));
+            list.Add(new Spec("num_elim_plural", "have been eliminated.", V.Female));
 
             return list;
         }

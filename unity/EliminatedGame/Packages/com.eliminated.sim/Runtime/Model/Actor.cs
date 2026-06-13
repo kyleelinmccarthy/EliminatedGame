@@ -49,13 +49,26 @@ namespace Eliminated.Sim.Model
         public float IFrameT;       // invulnerability frames (s)
 
         // ── Powerup status timers (seconds remaining) ────────────────────
-        public float PuSpeedT;      // ⚡ Zoomies
-        public float PuSlowT;       // 🐌 Molasses
-        public float PuReverseT;    // 🌀 Bamboozled
-        public float PuDizzyT;      // 💫 Dizzy
-        public float PuVisionT;     // 🔦 Lantern
-        public float PuTinyT;       // 🔻 Shrink
-        public float PuGiantT;      // 🎈 Embiggen
+        // À la Boomerang Fu: BLESSINGS persist for the rest of your life this
+        // round (their timer is set to PowerupEffects.Held, an effectively
+        // infinite value), while CURSES tick down and wear off. PowerupEffects
+        // owns which is which; the HUD reads "held vs draining" off the timer.
+        public float PuSpeedT;      // ⚡ Zoomies   (held / good)
+        public float PuSlowT;       // 🐌 Molasses  (timed / bad)
+        public float PuReverseT;    // 🌀 Bamboozled (timed / bad)
+        public float PuDizzyT;      // 💫 Dizzy     (timed / bad)
+        public float PuVisionT;     // 🔦 Lantern   (held / good)
+        public float PuTinyT;       // 🔻 Shrink    (held / good)
+        public float PuGiantT;      // 🎈 Embiggen  (timed / bad)
+        public float PuCaffeineT;   // ☕ Caffeine  (held / good) — dash with no cooldown
+        public float PuSlipperyT;   // 🍌 Slippery  (timed / bad) — ice-skate drift
+        public float PuDisguiseT;   // 🥸 Disguise  (held / good) — see DisguiseCharId
+
+        // ── Disguise (good): you look like another player to EVERYONE ELSE,
+        // but still yourself to you. The view swaps in this identity when
+        // rendering you for anyone who isn't you. null = not disguised.
+        public string DisguiseCharId;
+        public int DisguiseNumber;
 
         // ── Per-game scratch (DRY: shared games avoid bespoke subclasses) ─
         private Dictionary<string, float> _data;

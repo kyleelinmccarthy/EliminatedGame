@@ -51,22 +51,37 @@ Titles (by placement): "The Last Player Standing", "First Loser",
 - Direction from movement input, else facing/aim. Brief `ghost` visual.
 
 ### Powerups (`Powerups/`)
-8 shared kinds; spawned by a per-game `PowerupField` (cadence 2.2–3.2 s, max 4–6
+12 shared kinds; spawned by a per-game `PowerupField` (cadence 2.2–3.2 s, max 4–6
 on field, 55–70 % "good" bias, wall margin 120–150). Collect by walking/dashing in.
 
-| Kind | Good? | Effect | Duration |
+**À la Boomerang Fu:** every orb is an identical MYSTERY on the ground (the view
+draws a hue-cycling "?", no good/bad tell). The reveal — icon + name, floated over
+your blob in green / red / purple — is the "find out what you grabbed" payoff. And
+the lifecycle splits by tier: **blessings stay with you** for the rest of your life
+this round (their timer is set to `PowerupEffects.Held`, effectively infinite),
+while **curses tick down and wear off**. `PowerupCatalog` holds icon/label/blurb/
+tier for the reveal, the active-effect HUD strip, and how-to-play. The HUD reads
+"held vs draining" straight off the timer (`IsHeldTimer`).
+
+| Kind | Tier | Effect | Lifetime |
 |---|---|---|---|
-| ⚡ Zoomies (speed) | good | 1.6× move speed | 7 s |
+| ⚡ Zoomies (speed) | good | 1.6× move speed | held |
 | 🛡️ Bubble (shield) | good | blocks one hit/freeze/lava | until used |
-| 🔻 Shrink (tiny) | good | 0.62× scale, +nimble, smaller hitbox | 9 s |
-| 🔦 Lantern (vision) | good | +320 night-vision radius | 10 s |
+| 🔻 Shrink (tiny) | good | 0.62× scale, +nimble, smaller hitbox | held |
+| 🔦 Lantern (vision) | good | +320 night-vision radius | held |
+| ☕ Caffeine | good | dash with no cooldown | held |
+| 🥸 Disguise | good | look like another player to everyone but you | held |
 | 🌀 Bamboozled (reverse) | bad | controls reversed | 5 s |
 | 🐌 Molasses (slow) | bad | 0.5× speed | 6 s |
 | 🎈 Embiggen (giant) | bad | 1.5× scale, 0.62× speed, big target | 8 s |
 | 💫 Dizzy (dizzy) | bad | input steering wobbles (sine) | 5 s |
+| 🍌 Slippery | bad | ice-skate momentum (drift / overshoot) | 6 s |
+| 🔀 Jumble | chaos | warps you to a random spot (might save, might doom) | instant |
 
-Boomerang-only extras: ✨ multishot (3 rangs, 10 s), 🪃 big-rang (2.1× hit radius,
-10 s), 🧲 magnet (homing, 10 s).
+To revert blessings to timed durations, lower the single `PowerupEffects.Held`
+constant. Boomerang-only extras (its own combat set, all timed ~8–10 s): ⚡ speed,
+💥 big-rang (2.1× hit radius), 3️⃣ multishot (3 rangs), 🧲 magnet (homing), 🔻 tiny,
+🛡️ shield.
 
 ### Death rules
 - **Hardcore** — elimination is permanent for the whole series; dead players

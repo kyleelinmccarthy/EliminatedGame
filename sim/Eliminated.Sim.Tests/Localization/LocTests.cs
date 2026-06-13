@@ -70,7 +70,7 @@ namespace Eliminated.Sim.Tests.Localization
             // name announced at the round intro; lock that they all resolve to real text.
             foreach (var theme in new[] { "courtyard", "neon", "candy", "toxic", "beach", "haunt" })
                 Assert.NotEqual("room." + theme, Loc.GetIn("en", "room." + theme));
-            Assert.Equal("Welcome to Candy Kingdom!", Loc.Get("gm.room_intro", Loc.Get("room.candy")));
+            Assert.Equal("The arena: Candy Kingdom.", Loc.Get("gm.room_intro", Loc.Get("room.candy")));
         }
 
         [Fact]

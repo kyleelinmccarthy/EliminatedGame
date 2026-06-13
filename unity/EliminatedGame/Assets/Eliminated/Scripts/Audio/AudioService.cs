@@ -254,28 +254,92 @@ namespace Eliminated.Game.Audio
         /// so reveals and eliminations never slur together. Missing clips are skipped.
         /// Honors the SFX volume; silenced by the master mute like every other cue.
         /// </summary>
+        private AudioClip _spokenLine; // last stitched announcer line; freed when the next is built
+
         public void Speak(IReadOnlyList<string> clipNames, float volume = 1f)
         {
             if (_announce == null || clipNames == null || clipNames.Count == 0) return;
 
             foreach (var src in _announce) src.Stop(); // cancel any line in flight
 
-            float vol = Mathf.Clamp01(volume * (SaveService.Current?.settings.sfxVolume ?? 1f));
-            // Schedule on the DSP clock so consecutive clips are sample-accurate and
-            // gapless. One source per clip (lines are short — 1-2 clips); if a line
-            // ever exceeds the pool size it wraps and the tail isn't perfectly gapless.
-            double at = AudioSettings.dspTime + 0.06; // small lead so the first clip starts cleanly
+            // A numbered elimination call ("Player 387 has been eliminated", a numbered
+            // wipe) is many clips, and female calls ride a touch louder than unity — so we
+            // stitch the whole line into ONE clip and play it on a single source. The old
+            // per-source scheduling silently drops every clip past the 4-source pool, which
+            // would lop the first words off any line longer than four. A "@<ms>" token
+            // inserts a silent beat (the pause before "…eliminated").
+            float vol = Mathf.Clamp(volume * (SaveService.Current?.settings.sfxVolume ?? 1f), 0f, 1.6f);
+            var line = StitchLine(clipNames);
+            if (line != null)
+            {
+                if (_spokenLine != null) Destroy(_spokenLine);
+                _spokenLine = line;
+                var src = _announce[0];
+                src.clip = line;
+                src.volume = vol;
+                src.PlayScheduled(AudioSettings.dspTime + 0.06);
+                return;
+            }
+
+            // Fallback (clip PCM unreadable): schedule clips on the pool. Non-wrapping index
+            // so early clips aren't overwritten — a line longer than the pool loses its tail,
+            // not its head. "@<ms>" beats still advance the schedule.
+            double at = AudioSettings.dspTime + 0.06;
+            int s = 0;
             for (int i = 0; i < clipNames.Count; i++)
             {
-                var clip = Load(clipNames[i]);
+                var name = clipNames[i];
+                if (!string.IsNullOrEmpty(name) && name[0] == '@')
+                { if (float.TryParse(name.Substring(1), out var ms)) at += ms / 1000.0; continue; }
+                if (s >= _announce.Length) break;
+                var clip = Load(name);
                 if (clip == null) continue;
-                var src = _announce[i % _announce.Length];
+                var src = _announce[s++];
                 src.clip = clip;
                 src.volume = vol;
                 if (clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
                 src.PlayScheduled(at);
                 at += clip.length;
             }
+        }
+
+        // Concatenate the named clips — plus "@<ms>" silent beats — into one mono AudioClip
+        // at the bank's sample rate. Returns null if nothing could be read (caller falls back
+        // to per-source scheduling). The clips import DecompressOnLoad, so GetData yields PCM.
+        private AudioClip StitchLine(IReadOnlyList<string> clipNames)
+        {
+            int freq = 0, channels = 1, total = 0;
+            var segs = new List<float[]>(clipNames.Count);
+            for (int i = 0; i < clipNames.Count; i++)
+            {
+                var name = clipNames[i];
+                if (string.IsNullOrEmpty(name)) continue;
+                if (name[0] == '@') // silent beat, e.g. "@350" → 350 ms
+                {
+                    if (freq > 0 && int.TryParse(name.Substring(1), out int ms) && ms > 0)
+                    {
+                        int n = (int)((long)ms * freq / 1000) * channels;
+                        if (n > 0) { segs.Add(new float[n]); total += n; }
+                    }
+                    continue;
+                }
+                var clip = Load(name);
+                if (clip == null) continue;
+                if (clip.loadState != AudioDataLoadState.Loaded) clip.LoadAudioData();
+                if (freq == 0) { freq = clip.frequency; channels = Mathf.Max(1, clip.channels); }
+                else if (clip.frequency != freq || clip.channels != channels) continue; // uniform bank; skip oddballs
+                var buf = new float[clip.samples * clip.channels];
+                if (!clip.GetData(buf, 0)) continue;
+                segs.Add(buf);
+                total += buf.Length;
+            }
+            if (total <= 0 || freq <= 0) return null;
+            var data = new float[total];
+            int o = 0;
+            foreach (var seg in segs) { System.Array.Copy(seg, 0, data, o, seg.Length); o += seg.Length; }
+            var outClip = AudioClip.Create("gm_line", total / channels, channels, freq, false);
+            outClip.SetData(data, 0);
+            return outClip;
         }
 
         /// <summary>Stop any announcer line currently playing/queued (e.g. on mute).</summary>

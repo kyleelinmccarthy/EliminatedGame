@@ -131,7 +131,7 @@ namespace Eliminated.Sim.Games
                         }
                     }
                 }
-                _powerups.Collect(a);
+                _powerups.Collect(a, Actors);
             }
 
             // held balls track their holder

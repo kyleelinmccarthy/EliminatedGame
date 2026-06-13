@@ -160,7 +160,7 @@ namespace Eliminated.Sim.Games
                 MoveActor(a, dt); // handles dash + powerup speed/curses
                 if (_phase == McPhase.Music)
                 {
-                    _powerups.Collect(a);
+                    _powerups.Collect(a, Actors);
                     KeepMoving(a, dt);
                 }
             }

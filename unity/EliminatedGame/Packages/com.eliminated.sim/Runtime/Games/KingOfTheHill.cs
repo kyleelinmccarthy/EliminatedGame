@@ -162,7 +162,7 @@ namespace Eliminated.Sim.Games
 
                 if (a.HasAim) a.Facing = a.AimAngle;
                 ApplyKnockback(a, dt);
-                _powerups.Collect(a);
+                _powerups.Collect(a, Actors);
             }
 
             Separate();

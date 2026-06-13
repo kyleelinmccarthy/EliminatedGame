@@ -33,6 +33,16 @@ namespace Eliminated.Game.View
         private readonly List<GameObject> _balls = new List<GameObject>(); // pooled spheres (Ball)
         private int _ballsUsed;
 
+        // Powerup pickups are an identical MYSTERY on the ground (à la Boomerang Fu):
+        // a hovering, hue-cycling "?" orb — the same for every kind. The good/bad/chaos
+        // tell only arrives on PICKUP, as a reveal (icon + name, green/red/purple) that
+        // floats over your blob — the "find out what you grabbed" payoff.
+        private readonly List<Vector3> _pickupWorld = new List<Vector3>(); // orb "?" anchors this frame
+        private struct Reveal { public string ActorId; public Vector3 World; public float Born; public string Text; public Color Color; }
+        private readonly List<Reveal> _reveals = new List<Reveal>();
+        private GUIStyle _orbStyle, _revealStyle;
+        private const float RevealLife = 1.5f;
+
         // Arena theme. The live stage persists for the whole series, so the floor +
         // walls are re-themed each round (see MaybeAdvanceArena) rather than fixed at build.
         private Renderer _floorRenderer;            // live floor quad; re-skinned per round
@@ -374,14 +384,15 @@ namespace Eliminated.Game.View
                         continue;
                     }
 
+                    string present = DisguisePresent(a); // borrowed face for everyone but the local you
                     if (!_players.TryGetValue(a.Id, out var view))
                     {
                         view = new PlayerView();
                         view.Root.transform.SetParent(transform, false);
-                        view.Bind(a, ov);
+                        view.Bind(a, ov, present);
                         _players[a.Id] = view;
                     }
-                    view.Render(a, dt, ov, fo, fall, lift);
+                    view.Render(a, dt, ov, fo, fall, lift, present);
                     seen.Add(a.Id);
                 }
                 foreach (var kv in _players)
@@ -429,7 +440,7 @@ namespace Eliminated.Game.View
                         audio?.Play("good", 0.7f);
                         ScreenFx.Flash(new Color(1f, 0.85f, 0.35f), 0.18f);
                         break;
-                    case EffectKind.Pickup: audio?.Play("pickup", 0.8f); break;
+                    case EffectKind.Pickup: audio?.Play("pickup", 0.8f); SpawnReveal(fx); break;
                     case EffectKind.Ring: audio?.Play("chime", 0.6f); break;
                     case EffectKind.Freeze: audio?.Play("catch", 0.7f); break;
                     case EffectKind.Thaw: audio?.Play("pickup", 0.6f); break;
@@ -448,6 +459,7 @@ namespace Eliminated.Game.View
         private void RenderGameProps(Snapshot snap)
         {
             _propsUsed = 0; _boxesUsed = 0; _ballsUsed = 0; _dollUsed = false;
+            _pickupWorld.Clear();
             switch (snap?.Data)
             {
                 case Boomerang.BoomData boom:
@@ -877,8 +889,113 @@ namespace Eliminated.Game.View
                 Vector3 sp = _camera.WorldToScreenPoint(view.Root.transform.position + Vector3.up * 1.7f);
                 if (sp.z <= 0f) continue; // behind the camera
                 bool isLocal = locals != null && locals.Contains(a.Id);
-                DrawNumberTag(sp.x, Screen.height - sp.y, a.Number, isLocal);
+                // 🥸 Disguise: to everyone but you, the number reads as the impersonated player's.
+                int num = (!isLocal && !string.IsNullOrEmpty(a.DisguiseCharId) && a.DisguiseNumber > 0) ? a.DisguiseNumber : a.Number;
+                DrawNumberTag(sp.x, Screen.height - sp.y, num, isLocal);
             }
+
+            DrawMysteryOrbs();
+            DrawReveals();
+        }
+
+        // The "?" floating over every pickup orb — identical for all, so the ground
+        // never tells you good from bad. Projected from the anchors recorded in
+        // DrawPowerupToken; bobbing pale glyph with a dark outline for legibility.
+        private void DrawMysteryOrbs()
+        {
+            if (_pickupWorld.Count == 0) return;
+            if (_orbStyle == null)
+            {
+                var font = Resources.Load<Font>("Fonts/Baloo2-Bold");
+                _orbStyle = new GUIStyle { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = 20 };
+                if (font != null) _orbStyle.font = font;
+            }
+            foreach (var wp in _pickupWorld)
+            {
+                Vector3 sp = _camera.WorldToScreenPoint(wp);
+                if (sp.z <= 0f) continue;
+                OutlinedGlyph(sp.x, Screen.height - sp.y, "?", _orbStyle, new Color(1f, 1f, 1f, 0.95f), 1.5f);
+            }
+        }
+
+        // Pickup reveals: the icon + name that float up over your blob the instant you
+        // grab an orb (green blessing / red curse / purple wildcard) — the payoff that
+        // tells you what the mystery was. Rise + fade over RevealLife seconds.
+        private void DrawReveals()
+        {
+            if (_reveals.Count == 0) return;
+            if (_revealStyle == null)
+            {
+                var font = Resources.Load<Font>("Fonts/Baloo2-Bold");
+                _revealStyle = new GUIStyle { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = 26 };
+                if (font != null) _revealStyle.font = font;
+            }
+            float now = Time.unscaledTime;
+            for (int i = _reveals.Count - 1; i >= 0; i--)
+            {
+                var rv = _reveals[i];
+                float t = now - rv.Born;
+                if (t >= RevealLife) { _reveals.RemoveAt(i); continue; }
+                // Track the grabbing blob if it's still on stage; else stay where it was grabbed.
+                Vector3 anchor = rv.World;
+                if (rv.ActorId != null && _players.TryGetValue(rv.ActorId, out var pv) && pv.Root != null && pv.Root.activeSelf)
+                    anchor = pv.Root.transform.position + Vector3.up * 1.7f;
+                Vector3 sp = _camera.WorldToScreenPoint(anchor);
+                if (sp.z <= 0f) continue;
+                float k = t / RevealLife;
+                float x = sp.x, y = Screen.height - sp.y - k * 50f; // rise
+                float alpha = 1f - k * k;                            // ease-out fade
+                var col = new Color(rv.Color.r, rv.Color.g, rv.Color.b, alpha);
+                OutlinedGlyph(x, y, rv.Text, _revealStyle, col, 2f, alpha);
+            }
+        }
+
+        // One centered glyph/string with a 4-way black outline (its own dark backdrop,
+        // so it stays legible over any bright floor). Shared by "?" orbs and reveals.
+        private void OutlinedGlyph(float x, float y, string s, GUIStyle style, Color fill, float outline, float alpha = 1f)
+        {
+            const float bw = 240f; float bh = style.fontSize + 8f;
+            var r = new Rect(x - bw * 0.5f, y - bh * 0.5f, bw, bh);
+            var prev = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.85f * alpha);
+            GUI.Label(new Rect(r.x - outline, r.y, bw, bh), s, style);
+            GUI.Label(new Rect(r.x + outline, r.y, bw, bh), s, style);
+            GUI.Label(new Rect(r.x, r.y - outline, bw, bh), s, style);
+            GUI.Label(new Rect(r.x, r.y + outline, bw, bh), s, style);
+            GUI.color = fill;
+            GUI.Label(r, s, style);
+            GUI.color = prev;
+        }
+
+        // The identity to PRESENT for this actor: a disguised player wears a borrowed
+        // face for everyone EXCEPT the local player(s) who actually are them. (In-process
+        // play only — the online wire format doesn't carry DisguiseCharId, so a networked
+        // client sees everyone undisguised; extend Net/Wire.cs for parity.)
+        private string DisguisePresent(Actor a)
+        {
+            if (string.IsNullOrEmpty(a.DisguiseCharId)) return null;
+            var locals = _sim?.LocalPlayerIds;
+            return (locals != null && locals.Contains(a.Id)) ? null : a.DisguiseCharId;
+        }
+
+        // Spawn a pickup reveal from the sim's Pickup effect (fx.Tag = powerup key).
+        // The effect is emitted at the collector's position, so the nearest blob IS
+        // the player who grabbed it — we tag the reveal to them so it floats ALONG
+        // with them (Boomerang-Fu style) rather than stranding on the ground spot.
+        private void SpawnReveal(Effect fx)
+        {
+            string text = PowerupCatalog.RevealText(fx.Tag);
+            Color col = Color.white;
+            if (PowerupCatalog.TryGet(fx.Tag, out var meta)) ColorUtility.TryParseHtmlString(meta.ColorHex, out col);
+            Vector3 world0 = LogicalSpace.ToWorld(fx.X, fx.Y) + Vector3.up * 1.6f;
+            string actorId = null; float best = float.MaxValue;
+            foreach (var kv in _players)
+            {
+                if (kv.Value?.Root == null || !kv.Value.Root.activeSelf) continue;
+                float d = (kv.Value.Root.transform.position - world0).sqrMagnitude;
+                if (d < best) { best = d; actorId = kv.Key; }
+            }
+            _reveals.Add(new Reveal { ActorId = actorId, World = world0, Born = Time.unscaledTime, Text = text, Color = col });
         }
 
         // One "#N" tag centered above (x, y) in GUI space. The black outline gives each
@@ -907,37 +1024,28 @@ namespace Eliminated.Game.View
         {
             if (pickups == null) return;
             foreach (var p in pickups)
-                DrawPowerupToken(p.X, p.Y, p.Good); // Good is set by the sim (parsing Kind here mislabelled game-specific powerups)
+                DrawPowerupToken(p.X, p.Y); // every orb identical — a mystery until grabbed (web-canon)
         }
 
-        // A powerup reads as a powerup: a hovering, glowing orb (green = good / red = bad) with a
-        // ground shadow, a pulsing halo, and a bold white +/▾ badge so you instantly know whether
-        // to grab it or dodge it. (Was a tiny flat disc indistinguishable from floor décor.)
-        private void DrawPowerupToken(float x, float y, bool good)
+        // Every orb is the SAME hovering mystery: a hue-cycling glowing sphere with a
+        // pulsing halo and a "?" (drawn in OnGUI from the anchor recorded here). No
+        // good/bad tell on the ground — grabbing one is a gamble, and the reveal that
+        // floats over your blob is the payoff. (Was a green/red +/▾ badge.)
+        private void DrawPowerupToken(float x, float y)
         {
             float ph = Time.time * 2.2f + (x * 0.013f + y * 0.017f); // per-token phase (no lockstep)
             float bob = Mathf.Sin(ph) * 0.14f;
             float pulse = 0.5f + 0.5f * Mathf.Sin(ph * 1.4f);
-            Color body = good ? new Color(0.16f, 0.92f, 0.52f) : new Color(1f, 0.30f, 0.42f);
-            Color glow = good ? new Color(0.45f, 1f, 0.72f) : new Color(1f, 0.50f, 0.55f);
+            float hue = Mathf.Repeat(Time.time * 0.12f + (x * 0.0007f + y * 0.0009f), 1f); // slow rainbow, same rule for all
+            Color body = Color.HSVToRGB(hue, 0.55f, 1f);
+            Color glow = Color.HSVToRGB(hue, 0.35f, 1f);
             float wy = 0.62f + bob;
 
             Disc(x, y, 12f, new Color(0f, 0f, 0f, 0.30f), 0.02f);                                       // ground shadow
             Disc(x, y, 24f + pulse * 7f, new Color(glow.r, glow.g, glow.b, 0.20f + pulse * 0.18f), wy - 0.06f); // halo
             Ball(x, y, 18f, body, wy);                                                                   // orb body
-            Ball(x, y, 18f, new Color(1f, 1f, 1f, 0.16f), wy + 0.03f);                                   // sheen
-            // bold white badge nudged toward the camera (front face of the orb)
-            float gy = wy + 0.16f; float by = y - 6f;
-            if (good)
-            {
-                Box(x, by, 16f, 5f, Color.white, 0.05f, gy); // plus —
-                Box(x, by, 5f, 16f, Color.white, 0.05f, gy); // plus |
-            }
-            else
-            {
-                Bar(x - 8f, by - 5f, x, by + 5f, 5f, Color.white, 0.05f, gy); // ▾ left stroke
-                Bar(x + 8f, by - 5f, x, by + 5f, 5f, Color.white, 0.05f, gy); // ▾ right stroke
-            }
+            Ball(x, y, 18f, new Color(1f, 1f, 1f, 0.18f), wy + 0.03f);                                   // sheen
+            _pickupWorld.Add(LogicalSpace.ToWorld(x, y) + new Vector3(0f, wy + 0.22f, 0f));              // "?" anchor (OnGUI)
         }
 
         // A prop sitting at/below this world height is a flat GROUND decal (islands, pads,
@@ -1219,12 +1327,13 @@ namespace Eliminated.Game.View
         }
 
         // ── Prop builders ────────────────────────────────────────────────
-        // Caller-doll tuning. The imported FBX is OFF by default — it imports untextured
-        // and mis-scaled, which needs eyes-on setup in Unity (extract its textures, set a
-        // sensible scale/rotation in a prefab). Once it looks right in the editor, flip
-        // UseDollModel to true. Until then the (clean) procedural doll is used.
-        private const bool UseDollModel = false;
-        private const float DollHeight = 4.6f; // world units tall — the giant looms over the crowd
+        // Caller-doll tuning. The real "Squid Game Doll" FBX (Resources/Models/doll) is now used —
+        // FitDoll auto-scales it DOWN to DollHeight whatever its native size, and stands it on the
+        // floor. It carries the FBX's own material colours (no image textures needed). If it ever
+        // renders wrong in the editor, flip UseDollModel back to false (procedural fallback) or nudge
+        // the knobs below: DollPitch (lay-flat fix), DollYaw (facing), DollHeight (size).
+        private const bool UseDollModel = true;
+        private const float DollHeight = 4.2f; // world units tall — looms over the ~2.3u-tall blobs
         private const float DollPitch = 0f;    // X° — set to ±90 if the FBX imports lying flat (Z-up)
         private const float DollYaw = 180f;    // Y° — set to 0/90/270 if it faces the wrong way
         private float _dollFootY;              // model's foot height vs its root, after fitting

@@ -88,7 +88,7 @@ namespace Eliminated.Game.View
             _phase = (Root.GetInstanceID() & 1023) * 0.0131f;
         }
 
-        public void Bind(Actor a, Vector2? overrideLogical = null)
+        public void Bind(Actor a, Vector2? overrideLogical = null, string presentCharId = null)
         {
             _target = overrideLogical.HasValue
                 ? LogicalSpace.ToWorld(overrideLogical.Value.x, overrideLogical.Value.y)
@@ -98,19 +98,22 @@ namespace Eliminated.Game.View
             _prevWorld = _target;
             _hasPrev = false;
             _age = 0f;
-            EnsureArt(a);
+            EnsureArt(a, presentCharId ?? a.CharacterId);
         }
 
-        /// <summary>Attach the character's art prefab (once), or keep the player.</summary>
-        private void EnsureArt(Actor a)
+        /// <summary>Attach the presented character's art prefab (once), or keep the
+        /// player. <paramref name="charId"/> is normally the actor's own character,
+        /// but a disguised actor presents a BORROWED identity to everyone else; the
+        /// id can change mid-life (disguise on/off), so we rebind when it does.</summary>
+        private void EnsureArt(Actor a, string charId)
         {
-            if (_boundId == a.CharacterId) return;
-            _boundId = a.CharacterId;
+            if (_boundId == charId) return;
+            _boundId = charId;
 
             if (_art != null) { Object.Destroy(_art); _art = null; _artRenderers = null; }
             _faceR = _headR = null;
 
-            var prefab = CharacterArt.Load(a.CharacterId);
+            var prefab = CharacterArt.Load(charId);
             if (prefab == null) { _playerGo.SetActive(true); return; }
 
             _art = Object.Instantiate(prefab, Root.transform);
@@ -142,7 +145,7 @@ namespace Eliminated.Game.View
             _playerGo.SetActive(false); // hide the procedural player; the art replaces it
         }
 
-        public void Render(Actor a, float dt, Vector2? overrideLogical = null, float? overrideFacing = null, bool fallDeath = false, bool airborne = false)
+        public void Render(Actor a, float dt, Vector2? overrideLogical = null, float? overrideFacing = null, bool fallDeath = false, bool airborne = false, string presentCharId = null)
         {
             if (a == null)
             {
@@ -179,11 +182,17 @@ namespace Eliminated.Game.View
             _hasPrev = true;
             float speed = vel.magnitude;
 
+            // 🥸 Disguise: present a borrowed identity to everyone but yourself. The
+            // id can flip mid-life, so rebind the art if it changed.
+            bool disguised = presentCharId != null && presentCharId != a.CharacterId;
+            string effId = disguised ? presentCharId : a.CharacterId;
+            EnsureArt(a, effId);
+
             if (_art != null) RenderArt(a, vel, speed, overrideFacing);
-            else RenderPlayer(a, vel, speed, overrideFacing);
+            else RenderPlayer(a, vel, speed, overrideFacing, effId);
 
             float visualH = LogicalSpace.WorldRadius(a.Radius) * (_art != null ? ArtHeightFactor : 2f);
-            SyncAccessories(a, visualH);
+            SyncAccessories(a, visualH, disguised); // hide your own cosmetics behind the mask
         }
 
         // ── Present coffin (elimination) ─────────────────────────────────
@@ -296,9 +305,10 @@ namespace Eliminated.Game.View
             ViewMaterials.SetColor(rend, new MaterialPropertyBlock(), color);
         }
 
-        private void SyncAccessories(Actor a, float H)
+        private void SyncAccessories(Actor a, float H, bool hide = false)
         {
-            string key = (a.Accessories == null || a.Accessories.Count == 0) ? "" : string.Join(",", a.Accessories);
+            // While disguised, your own worn cosmetics would give the mask away — drop them.
+            string key = (hide || a.Accessories == null || a.Accessories.Count == 0) ? "" : string.Join(",", a.Accessories);
             if (key != _accKey)
             {
                 _accKey = key;
@@ -425,9 +435,9 @@ namespace Eliminated.Game.View
                 }
         }
 
-        private void RenderPlayer(Actor a, Vector3 vel, float speed, float? overrideFacing = null)
+        private void RenderPlayer(Actor a, Vector3 vel, float speed, float? overrideFacing = null, string presentCharId = null)
         {
-            Color col = a.Team >= 0 ? Palette.Team(a.Team) : Palette.Body(a.CharacterId);
+            Color col = a.Team >= 0 ? Palette.Team(a.Team) : Palette.Body(presentCharId ?? a.CharacterId);
             if (a.Frozen) col = Color.Lerp(col, new Color(0.6f, 0.85f, 1f), 0.6f);
             if (a.Burning) col = Color.Lerp(col, Palette.Danger, 0.5f);
             if (a.Ghost) col = Color.Lerp(col, Color.white, 0.5f);

@@ -135,7 +135,7 @@ namespace Eliminated.Sim.Games
 
                 if (a.Get("spikeT") > 0f && a.DashT <= 0f) MoveAt(a, dt, SpikeLunge);
                 else MoveActor(a, dt);
-                _powerups.Collect(a);
+                _powerups.Collect(a, Actors);
             }
 
             UpdateBalloons(dt);
