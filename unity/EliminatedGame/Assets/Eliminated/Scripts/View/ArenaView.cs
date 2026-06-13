@@ -358,10 +358,30 @@ namespace Eliminated.Game.View
         /// <summary>Render one snapshot now. Used by the live loop (via <see cref="LateUpdate"/>)
         /// and by offscreen preview baking, which supplies a fixed snapshot, a large dt to
         /// settle the spawn-pop, and <paramref name="playAudio"/> = false.</summary>
+        // [EG-CHARDBG] TEMP: once-per-round readout of the LOCAL player's character, so we can see
+        // "what is YOUR character this round" even when the art doesn't rebind. Pairs with the
+        // per-bind log in PlayerView.EnsureArt. Remove when the respawn-character bug is fixed.
+        private int _dbgRound = int.MinValue;
+
         public void RenderSnapshot(Snapshot snap, float dt, bool playAudio)
         {
             if (snap?.Actors != null)
             {
+                if (PlayerView.CharDbg && _themeIndex < 0 && _sim != null && _sim.RoundIndex != _dbgRound)
+                {
+                    _dbgRound = _sim.RoundIndex;
+                    var locals = _sim.LocalPlayerIds;
+                    if (locals != null)
+                        foreach (var lid in locals)
+                            foreach (var la in snap.Actors)
+                                if (la.Id == lid)
+                                {
+                                    string pres = DisguisePresent(la);
+                                    Debug.Log($"[EG-CHARDBG] round={_dbgRound} game={snap.Game} LOCAL id={la.Id} number={la.Number} CharacterId={la.CharacterId} present={(pres ?? "-")} disguise={(string.IsNullOrEmpty(la.DisguiseCharId) ? "-" : la.DisguiseCharId)} alive={la.Alive}");
+                                    break;
+                                }
+                }
+
                 var layout = BuildLayout(snap, dt);
                 var seen = new HashSet<string>();
                 foreach (var a in snap.Actors)
@@ -538,16 +558,21 @@ namespace Eliminated.Game.View
                             Disc(b.X, b.Y, 7f, new Color(0f, 0f, 0f, 0.22f), 0.02f);
                         }
                     DrawPickups(keepy.Pickups);
-                    // The spike "pin" juts from a player while their spike is out (a.Progress 0..1),
-                    // so you can see the dangerous moment to pop balloons (web drawSpikePin).
+                    // A push pin (thumbtack) juts from a player while their spike is out (a.Progress
+                    // 0..1): a round red plastic head at the hand, a thin steel needle, and a glinting
+                    // sharp point that pops balloons — "the pins remain." Replaces the old glowing bar.
                     if (snap.Actors != null)
                         foreach (var a in snap.Actors)
                             if (a.Alive && a.Progress > 0f)
                             {
                                 float reach = 30f + 30f * a.Progress;
-                                float tx = a.Pos.X + Mathf.Cos(a.Facing) * reach, ty = a.Pos.Y + Mathf.Sin(a.Facing) * reach;
-                                Bar(a.Pos.X, a.Pos.Y, tx, ty, 6f, new Color(1f, 1f, 1f, 0.85f), 0.1f, 0.95f);
-                                Ball(tx, ty, 6f, new Color(0.85f, 0.95f, 1f), 0.98f); // bright tip
+                                float cos = Mathf.Cos(a.Facing), sin = Mathf.Sin(a.Facing);
+                                float hx = a.Pos.X + cos * 13f, hy = a.Pos.Y + sin * 13f;     // round head, just past the hand
+                                float tx = a.Pos.X + cos * reach, ty = a.Pos.Y + sin * reach; // sharp point (pops balloons)
+                                Bar(hx, hy, tx, ty, 2.6f, new Color(0.80f, 0.83f, 0.90f), 0.12f, 0.95f);   // steel needle shaft
+                                Ball(tx, ty, 2.8f, new Color(0.97f, 0.98f, 1f), 1f);                       // glinting tip
+                                Ball(hx, hy, 8.5f, new Color(0.92f, 0.18f, 0.24f), 0.92f);                 // red plastic head
+                                Ball(hx - cos * 2.5f, hy - sin * 2.5f, 3.5f, new Color(1f, 0.62f, 0.66f, 0.85f), 0.98f); // head gloss
                             }
                     break;
 
@@ -704,6 +729,10 @@ namespace Eliminated.Game.View
                     // once revealed, the SHATTERED side shows a dark red break, an inferred hole is
                     // dark, and untested panes are cloudy glass. The active player stands on the safe
                     // panes (see GlassLayout) so the path it took reads clearly.
+                    // Dark abyss backdrop first — without it a bright floor theme washes the scene out
+                    // white and the low-alpha cloudy panes vanish (matches KeepyUppy/KotH). The chasm
+                    // beneath the glass is also the web's look: panes glow over a void.
+                    Box(640f, 360f, 1320f, 760f, new Color(0.055f, 0.035f, 0.12f, 0.95f), 0.01f, 0.006f); // chasm beneath the bridge (web #1a1030→#06040f indigo void)
                     Box(150f, 360f, 220f, 560f, new Color(0.18f, 0.16f, 0.24f), 0.02f, 0.011f);   // near platform
                     Box(1130f, 360f, 220f, 560f, new Color(0.18f, 0.16f, 0.24f), 0.02f, 0.011f);  // far platform
                     int rows = Mathf.Max(1, glass.Rows);
@@ -753,15 +782,23 @@ namespace Eliminated.Game.View
                     break;
                 }
 
-                case PresentSwap.PresentData _:
+                case PresentSwap.PresentData present:
                 {
                     // Sim seats everyone in an ellipse; a wrapped gift (pink ribbon #ff2e88, per the
-                    // web's wrap) sits just in front of each player, facing the centre.
+                    // web's wrap) sits just in front of the players who actually RECEIVED one — only a
+                    // handful per round, never the whole ring. Receivers are only known once the lights
+                    // come back on (guess/reveal expose ReceiverId); during the "lights out" gift phase
+                    // the events carry no receiver, so nothing is drawn — the gifts are still being
+                    // slipped in secret.
                     Disc(640f, 360f, 190f, new Color(0.16f, 0.10f, 0.22f), 0.012f); // centre rug
+                    var receivers = new HashSet<string>();
+                    if (present.Events != null)
+                        foreach (var e in present.Events)
+                            if (!string.IsNullOrEmpty(e.ReceiverId)) receivers.Add(e.ReceiverId);
                     if (snap.Actors != null)
                         foreach (var a in snap.Actors)
                         {
-                            if (!a.Alive) continue;
+                            if (!a.Alive || !receivers.Contains(a.Id)) continue;
                             float dxp = 640f - a.Pos.X, dyp = 360f - a.Pos.Y;
                             float len = Mathf.Max(1f, Mathf.Sqrt(dxp * dxp + dyp * dyp));
                             float px = a.Pos.X + dxp / len * 58f, py = a.Pos.Y + dyp / len * 58f;
@@ -802,13 +839,19 @@ namespace Eliminated.Game.View
                         foreach (var l in ch.Ladders)
                             if (l != null && l.Length >= 2) DrawLadder(Cell(l[0]), Cell(l[1])); // wooden rails + rungs
                     if (ch.Chutes != null)
+                    {
+                        // Fork arms are decorative (they angle down toward the two outcomes, not at real
+                        // neighbour cells). Clamp their ends to the board rect so a chute on an edge column
+                        // doesn't shoot an arm off the board.
+                        float bL = ox + pitch * 0.12f, bR = ox + pitch * cols - pitch * 0.12f, bB = oyBottom - pitch * 0.12f;
                         foreach (var cv in ch.Chutes)
                         {
                             var cc = Cell(cv.Square);
-                            var dl = new Vector2(cc.x - pitch * 0.62f, cc.y + pitch * 0.5f); // down-left fork arm
-                            var dr = new Vector2(cc.x + pitch * 0.62f, cc.y + pitch * 0.5f); // down-right fork arm
+                            var dl = new Vector2(Mathf.Clamp(cc.x - pitch * 0.62f, bL, bR), Mathf.Min(cc.y + pitch * 0.5f, bB)); // down-left fork arm
+                            var dr = new Vector2(Mathf.Clamp(cc.x + pitch * 0.62f, bL, bR), Mathf.Min(cc.y + pitch * 0.5f, bB)); // down-right fork arm
                             DrawChute(cc, dl, dr, cv.Left, cv.Right);
                         }
+                    }
                     // Pulse the local player's cell while they're at a fork (the key decision beat).
                     string myId = (_sim?.LocalPlayerIds != null && _sim.LocalPlayerIds.Count > 0) ? _sim.LocalPlayerIds[0] : null;
                     if (myId != null && ch.Climbers != null)
@@ -894,6 +937,11 @@ namespace Eliminated.Game.View
             if (!_sim.HasSeries || !_sim.PlayStarted || _sim.Phase != RoomPhase.Playing) return;
             var snap = _sim.Latest;
             if (snap?.Actors == null) return;
+            // Chutes & Ladders renders as a full-screen 2D HUD board (DrawChutesBoard) that hides the
+            // 3D arena behind a dark backdrop. The overhead #N tags below are projected from the players'
+            // hidden 3D board positions — a totally different layout than the HUD board — so letting them
+            // draw just scatters bare numbers over the takeover. Skip the whole arena overlay for it.
+            if (snap.Game == GameId.ChutesAndLadders) return;
 
             if (_numStyle == null)
             {

@@ -1654,10 +1654,10 @@ namespace Eliminated.Game.UI
                 if (sp == null) continue;
                 // Glasses fit to the character's REAL eyes (a lens on each), tilted to match — the
                 // animals' eyes are wide-set and slightly uneven, so a flat centred sprite misses.
-                if (slot == "eyes" && thumb.Has && CharacterArt.TryEyes(prof.characterId, out var feL, out var feR, out var feRad))
+                if (slot == "eyes" && thumb.Has && CharacterArt.TryEyes(prof.characterId, out var feL, out var feR, out var feRad, out var feTight))
                 {
                     if (id == "eyepatch") DrawSpannedEyewear(sp.texture, thumb, fit, feL, feR); // asymmetric: one patch + strap
-                    else DrawFittedEyewear((AccessoryArt.GetLenses(id) ?? sp).texture, thumb, fit, feL, feR, feRad, prof.characterId == "clown" ? fit.width * 0.07f : 0f);             // two lenses, one per eye
+                    else DrawFittedEyewear((AccessoryArt.GetLenses(id) ?? sp).texture, thumb, fit, feL, feR, feRad, feTight, prof.characterId == "clown" ? fit.width * 0.07f : 0f);             // two lenses, one per eye
                 }
                 else
                     GUI.DrawTexture(AccPreviewRect(slot, fit, thumb, prof.characterId), sp.texture, ScaleMode.ScaleToFit, true);
@@ -1701,17 +1701,21 @@ namespace Eliminated.Game.UI
         // One fixed sprite can't match every character's eye spacing AND size (the owl's big close
         // eyes vs a cat's small wide ones), so we place each lens individually: cropped from the
         // sprite, centred on the detected eye, scaled to that eye.
-        private static void DrawFittedEyewear(Texture tex, CharacterPreview.Thumb thumb, Rect fit, Vector2 eyeL, Vector2 eyeR, float eyeRad, float leftShift = 0f)
+        private static void DrawFittedEyewear(Texture tex, CharacterPreview.Thumb thumb, Rect fit, Vector2 eyeL, Vector2 eyeR, float eyeRad, bool tightFace, float leftShift = 0f)
         {
             Vector2 L = FacePoint(eyeL, thumb, fit), R = FacePoint(eyeR, thumb, fit);
             if (L.x > R.x) { var tmp = L; L = R; R = tmp; }
             float faceW = thumb.FaceRect.width * fit.width;
             float eyeGap = Mathf.Max(1f, Mathf.Abs(R.x - L.x));
-            // lens radius: cover the eye (with a floor so tiny-eyed faces still get real glasses),
-            // but never so large the two rims collide into a figure-8. The floor is tied to the eye
-            // SPACING, not the whole face box — a face box much wider than the eyes (the frog wizard's
-            // small, wide-set eyes) otherwise forces lenses ~3× the eye that swallow the face.
-            float sr = Mathf.Max(eyeRad * faceW * 1.3f, eyeGap * 0.20f);
+            // lens radius: cover the eye, with a FLOOR so tiny detected pupils still get real glasses.
+            // The detected eye radius only catches the dark pupil/ring, so it badly under-reads big eyes
+            // (owls, clown) — for characters with a real face part, floor on FACE WIDTH (the calibrated
+            // 0.26). Single-sprite "blob" characters (frog wizard, food) have no face part, so their
+            // face box is a loose body-fraction; a face-width floor would balloon the lenses and swallow
+            // their small eyes, so floor those on the eye SPACING instead. The caps below keep close-set
+            // eyes (the clown's) from colliding into a figure-8.
+            float floor = tightFace ? faceW * 0.26f : eyeGap * 0.20f;
+            float sr = Mathf.Max(eyeRad * faceW * 1.3f, floor);
             sr = Mathf.Min(sr, faceW * 0.42f);    // never dominate the face (keeps the clown's big eyes in check)
             sr = Mathf.Min(sr, eyeGap * 0.47f);   // lenses just touch at most — no overlap, so the rims can't cross into a second "bridge"
             sr = Mathf.Max(sr, 4f);
@@ -1778,6 +1782,7 @@ namespace Eliminated.Game.UI
             float hcx = hx + hr.width * 0.5f;     // head centre X
             float htop = hr.y + hr.height;        // head top (Norm, Y-up)
             float hw = hr.width;
+            float aspect = fit.height > 0f ? fit.width / fit.height : 1f; // thumbnail W/H, for sprite-Y math
             // Face box (screen X) — glasses ride the real eyes; the ear-inflated head box overshoots them.
             var fr = thumb.FaceRect;
             float fx = thumb.Flip ? (1f - fr.x - fr.width) : fr.x;
@@ -1789,9 +1794,18 @@ namespace Eliminated.Game.UI
                 // box is inflated by ears/horns/tufts, so the old top-right corner (0.86/0.80)
                 // floated the flower off the head on most players. 0.68 across / 0.69 up tucks it
                 // beside the head for every character (bears, demons, cats, owls, cow, …).
-                case "head": ax = hcx;             ay = htop + hw * 0.12f;        s = hw * 1.00f; break; // hat on the crown
+                // Hat on the crown. Seat the BRIM ~0.06 into the head top, not the sprite centre — the
+                // hat art lives in the upper half of its 128px canvas (brim at sprite-y52 ≈ 0.094 below
+                // centre), so anchoring the centre above the head left the brim floating above it. The
+                // +0.094·s·aspect cancels that bias (aspect because the square sprite is sized by WIDTH).
+                // Cap the width: the MiMU animal rigs' head box is the whole-body silhouette (hw≈1), which
+                // gave a character-wide hat.
+                case "head": s = Mathf.Min(hw, 0.66f); ax = hcx; ay = htop - 0.06f + 0.094f * s * aspect; break;
                 case "eyes": ax = fcx;             ay = fr.y + fr.height * 0.62f; s = fr.width * 1.00f; break; // glasses fallback (no measured eyes, e.g. slime/humans): centred on the face
-                case "neck": ax = hcx;             ay = hr.y + hr.height * 0.02f; s = hw * 0.80f; break; // collar at the neck
+                // Collar/bowtie at the neck — anchor to the FACE box (just below the chin), NOT the head
+                // box: the MiMU animal rigs name their whole-body silhouette "Head", so its bottom is at
+                // the FEET and its width is the whole character (collar ended up at the feet, huge).
+                case "neck": ax = fcx;             ay = fr.y - fr.height * 0.06f; s = fr.width * 0.85f; break;
                 case "ear":
                     ax = hx + hw * 0.68f; ay = hr.y + hr.height * 0.69f; s = hw * 0.52f; // flower tucked beside the ear
                     // Per-character fixes where the generic spot lands wrong:
@@ -2459,7 +2473,7 @@ namespace Eliminated.Game.UI
                     // single-letter Choose inputs, so each button press is one throw.
                     string rpsId = (_router.LocalPlayerIds != null && _router.LocalPlayerIds.Count > 0) ? _router.LocalPlayerIds[0] : null;
                     var myDuel = (rpsId == null || rps.Duels == null) ? null : rps.Duels.FirstOrDefault(d => d.A == rpsId || d.B == rpsId);
-                    if (myDuel != null && myDuel.Status != "done")
+                    if (myDuel != null && myDuel.Status != "done" && (rps.Phase == "pick" || rps.Phase == "drop"))
                     {
                         bool isA = myDuel.A == rpsId;
                         var myThrows = isA ? myDuel.AThrows : myDuel.BThrows;
@@ -2505,6 +2519,36 @@ namespace Eliminated.Game.UI
                                     _router.SubmitFor(rpsId, GameInput.Choose(t));
                             }
                             GUI.Box(new Rect(bx, by + 62f, 384f, 24f), string.IsNullOrEmpty(myKeep) ? "tap the throw you'll KEEP" : "locked in — good luck!", _pill);
+                        }
+                    }
+                    // Verdict — the ask: make it unmistakable whether YOU won or lost. The controls
+                    // above vanish the instant a duel resolves; without this the player just saw their
+                    // buttons disappear with no result. During `resolve` the keeps are revealed, so we
+                    // also show the matchup (you: X vs opp: Y). Ties announce a replay.
+                    if (myDuel != null && rpsId != null)
+                    {
+                        bool isA = myDuel.A == rpsId;
+                        bool decided = myDuel.Status == "done" && !string.IsNullOrEmpty(myDuel.Winner);
+                        bool tie = rps.Phase == "resolve" && myDuel.Status == "pick" && myDuel.Ties > 0;
+                        if (decided || tie)
+                        {
+                            bool won = decided && myDuel.Winner == rpsId;
+                            Color vc = tie ? Yellow : (won ? Green : new Color(1f, 0.35f, 0.35f));
+                            string verdict = tie ? "TIE — REPLAY!" : (won ? "YOU WIN!" : "ELIMINATED");
+                            var vR = new Rect(w / 2f - 220f, h * 0.30f, 440f, 64f);
+                            Fill(vR, new Color(0f, 0f, 0f, 0.74f), 14f);
+                            Stroke(vR, vc, 3.5f, 14f);
+                            OutlineLbl(vR, verdict, new GUIStyle(_h1) { fontSize = 40, alignment = TextAnchor.MiddleCenter, normal = { textColor = vc } }, 3.5f, 6f);
+                            string myKeep = isA ? myDuel.AKeep : myDuel.BKeep;
+                            string oppKeep = isA ? myDuel.BKeep : myDuel.AKeep;
+                            string oppId = isA ? myDuel.B : myDuel.A;
+                            if (!string.IsNullOrEmpty(myKeep) || !string.IsNullOrEmpty(oppKeep))
+                            {
+                                string line = $"you: {RpsThrowName(myKeep)}    vs    {Name(oppId)}: {RpsThrowName(oppKeep)}";
+                                var sR = new Rect(w / 2f - 220f, h * 0.30f + 70f, 440f, 28f);
+                                Fill(sR, new Color(0f, 0f, 0f, 0.6f), 8f);
+                                OutlineLbl(sR, line, new GUIStyle(_ui) { fontSize = 16, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } }, 1.5f, 2f);
+                            }
                         }
                     }
                     break;
@@ -2684,7 +2728,7 @@ namespace Eliminated.Game.UI
 
         /// <summary>R/P/S → the full throw name for the RPS pick read-out.</summary>
         private static string RpsThrowName(string t)
-            => t == "R" ? "Rock" : t == "P" ? "Paper" : t == "S" ? "Scissors" : t;
+            => t == "R" ? "Rock" : t == "P" ? "Paper" : t == "S" ? "Scissors" : string.IsNullOrEmpty(t) ? "—" : t;
 
         /// <summary>The keyboard key that performs a Simon command (W/A/S/D/Space),
         /// matching LocalInputHub's mapping, so the prompt names the exact key to press.</summary>
@@ -2715,12 +2759,16 @@ namespace Eliminated.Game.UI
             Fill(new Rect(0, 0, w, h), new Color(0.09f, 0.05f, 0.15f, 1f), 0f);
             Fill(new Rect(0, 0, w, h * 0.6f), new Color(0.16f, 0.09f, 0.26f, 0.5f), 0f); // soft top glow
 
-            // Board geometry: as large as fits, left-aligned, a control column on the right.
-            const float ctrlW = 300f;
+            // Board geometry: a square board sized to fit, with a control column beside it. The whole
+            // board+controls block is CENTRED horizontally so it isn't stranded on the left of a wide
+            // window (which left a big empty void on the right).
+            const float ctrlW = 300f, gap = 34f;
             float boardSize = Mathf.Clamp(Mathf.Min(h - 96f, w - ctrlW - 80f), 240f, 720f);
-            float bx = 44f, by = Mathf.Max((h - boardSize) * 0.5f + 6f, 74f); // keep clear of the top header
+            float groupW = boardSize + gap + ctrlW;
+            float bx = Mathf.Max(44f, (w - groupW) * 0.5f);
+            float by = Mathf.Max((h - boardSize) * 0.5f + 6f, 74f); // keep clear of the top header
             float cw = boardSize / cols, chh = boardSize / rows;
-            float ctrlX = bx + boardSize + 34f;
+            float ctrlX = bx + boardSize + gap;
 
             Vector2 Cell(int sq)
             {
@@ -2752,10 +2800,24 @@ namespace Eliminated.Game.UI
             // Ladders (climb up).
             if (ch.Ladders != null)
                 foreach (var l in ch.Ladders) DrawLadder2D(Cell(l[0]), Cell(l[1]), Mathf.Min(cw, chh));
-            // Chute forks (one neighbour resets you, one is the abyss).
+            // Chute forks: a hazard mouth on the square with two slide-arms angling DOWN (a chute drags
+            // you down — toward reset/abyss). Drawn as a fixed downward fork clamped to the board, NOT
+            // pointed at the serpentine neighbours square±1 — those jump to the row above/below at a row
+            // boundary, so an arm shot vertically across rows and tangled with the ladders.
             if (ch.Chutes != null)
+            {
+                float cell = Mathf.Min(cw, chh);
+                float margin = Mathf.Max(5f, cell * 0.16f) + 2f;           // keep the outcome balls inside the frame
+                float bL = bx + margin, bR = bx + boardSize - margin, bBot = by + boardSize - margin;
+                Vector2 ClampB(Vector2 p) => new Vector2(Mathf.Clamp(p.x, bL, bR), Mathf.Min(p.y, bBot));
                 foreach (var cv in ch.Chutes)
-                    DrawChuteFork2D(Cell(cv.Square), Cell(Mathf.Max(1, cv.Square - 1)), Cell(Mathf.Min(ch.Goal, cv.Square + 1)), cv.Left, cv.Right, Mathf.Min(cw, chh));
+                {
+                    Vector2 src = Cell(cv.Square);
+                    Vector2 dl = ClampB(src + new Vector2(-cw * 0.58f, chh * 0.62f));
+                    Vector2 dr = ClampB(src + new Vector2(cw * 0.58f, chh * 0.62f));
+                    DrawChuteFork2D(src, dl, dr, cv.Left, cv.Right, cell);
+                }
+            }
 
             // The Squid Game doll (same caller as Red-Light / Simon) presides over the FINISH —
             // reach her square or be eliminated. We draw the REAL 3D model via an offscreen render

@@ -4,7 +4,7 @@ Announcer voicelines rendered offline with **Piper** (neural TTS, a build-time
 tool — not a runtime/Unity dependency), for natural near-web quality. The game
 plays/queues these WAVs at runtime (see `Scripts/Audio/Announcer.cs`).
 
-- male announcer  : `en_US-joe-medium.onnx`
+- male announcer  : `norman.onnx`
 - female announcer: `en_US-ljspeech-medium.onnx`
 - **Ship only CC0 / public-domain voices** (e.g. en_US-joe = CC0, en_US-kristin =
   public domain). Record the chosen voices + licenses in `docs/ASSET_SOURCES.md`.

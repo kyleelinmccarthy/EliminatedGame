@@ -17,6 +17,9 @@ namespace Eliminated.Game.View
     /// </summary>
     public sealed class PlayerView
     {
+        // [EG-CHARDBG] TEMP: set false to silence the per-bind character diagnostic below.
+        public static bool CharDbg = true;
+
         public readonly GameObject Root;
 
         // --- procedural player (fallback when a character has no art prefab) ---
@@ -114,6 +117,11 @@ namespace Eliminated.Game.View
             _faceR = _headR = null;
 
             var prefab = CharacterArt.Load(charId);
+            // [EG-CHARDBG] TEMP diagnostic for "casual loads me as a different character after I die".
+            // Logs every time an actor's on-screen art (re)binds. Filter the Unity Console for
+            // "local0" (or your player id) and watch what `requested`/`prefab` are each round — if
+            // they ever differ from your chosen character we've found the swap. Remove when fixed.
+            if (CharDbg) Debug.Log($"[EG-CHARDBG] bind actorId={a.Id} number={a.Number} CharacterId={a.CharacterId} requested={charId} disguise={(string.IsNullOrEmpty(a.DisguiseCharId) ? "-" : a.DisguiseCharId)} alive={a.Alive} prefab={(prefab != null ? prefab.name : "<procedural>")}");
             if (prefab == null) { _playerGo.SetActive(true); return; }
 
             _art = Object.Instantiate(prefab, Root.transform);
@@ -396,9 +404,16 @@ namespace Eliminated.Game.View
             float cx = hb.center.x, w = hb.size.x, hgt = hb.size.y, bot = hb.min.y, top = hb.max.y, z = hb.center.z - 0.05f;
             switch (slot)
             {
-                case "head": pos = new Vector3(cx, top + w * 0.12f, z);   scale = w * 1.00f; break; // hat above the crown
+                // Hat on the crown. The hat art sits in the upper half of its sprite (brim ≈ 0.094 below
+                // centre), so seat the brim ~0.05·w into the head top instead of floating the centre above
+                // it. Cap the width — the MiMU rigs' "Head" is the whole-body silhouette (w = full width).
+                case "head": scale = w * 0.66f; pos = new Vector3(cx, top - w * 0.05f + 0.094f * scale, z); break;
                 case "eyes": pos = new Vector3(cx, bot + hgt * 0.55f, z); scale = w * 0.62f; break; // glasses centred (no eye data)
-                case "neck": pos = new Vector3(cx, bot + hgt * 0.02f, z); scale = w * 0.80f; break; // collar at the neck
+                case "neck": // collar at the neck — anchor to the FACE renderer (just below the chin),
+                {            // NOT the head box: the MiMU rigs name the whole-body silhouette "Head".
+                    var fb = (_faceR != null ? _faceR : hr).bounds;
+                    pos = new Vector3(fb.center.x, fb.min.y - fb.size.y * 0.06f, z); scale = fb.size.x * 0.85f; break;
+                }
                 case "ear":  pos = new Vector3(hb.min.x + w * (flip ? 0.32f : 0.68f), bot + hgt * 0.69f, z); scale = w * 0.52f; break; // flower beside the ear
                 default:     pos = new Vector3(cx, top, z);               scale = w * 0.80f; break;
             }

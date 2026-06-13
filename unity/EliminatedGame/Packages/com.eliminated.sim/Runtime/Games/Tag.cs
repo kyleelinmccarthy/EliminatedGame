@@ -122,7 +122,32 @@ namespace Eliminated.Sim.Games
         private void ResolveContacts()
         {
             var alive = Alive;
-            // FREEZE
+            // THAW first (outside deep freeze): touching a frozen teammate frees them
+            // BEFORE the freeze pass runs, so a rescuer who runs over a frozen ally lands
+            // the thaw even when a freezer is chasing them — they free their friend (who
+            // gets a brief head start) and may themselves get caught for the trouble. With
+            // freeze resolved first, the chaser froze the rescuer before the rescue could
+            // land, so "running over" a frozen player simply did nothing.
+            if (!_deepFreeze)
+            {
+                foreach (var r in alive)
+                {
+                    if (r.Team != RunnerTeam || r.Frozen) continue;
+                    foreach (var t in alive)
+                    {
+                        if (t == r || t.Team != RunnerTeam || !t.Frozen) continue;
+                        if (Vec2.Distance(r.Pos, t.Pos) < ThawR)
+                        {
+                            t.Frozen = false;
+                            t.Anim = AnimState.Idle;
+                            t.Set("immune", ThawImmune);
+                            Emit(new Effect(EffectKind.Thaw, t.Pos.X, t.Pos.Y));
+                        }
+                    }
+                }
+            }
+            // FREEZE: a just-thawed runner's ThawImmune keeps a hovering freezer from
+            // instantly re-freezing them this same tick.
             foreach (var f in alive)
             {
                 if (f.Team != FreezerTeam || f.Get("freezeCd") > 0f) continue;
@@ -146,25 +171,6 @@ namespace Eliminated.Sim.Games
                         f.Set("freezes", f.Get("freezes") + 1f);
                         f.Set("freezeCd", FreezeCd);
                         break;
-                    }
-                }
-            }
-            // THAW (outside deep freeze)
-            if (!_deepFreeze)
-            {
-                foreach (var r in alive)
-                {
-                    if (r.Team != RunnerTeam || r.Frozen) continue;
-                    foreach (var t in alive)
-                    {
-                        if (t == r || t.Team != RunnerTeam || !t.Frozen) continue;
-                        if (Vec2.Distance(r.Pos, t.Pos) < ThawR)
-                        {
-                            t.Frozen = false;
-                            t.Anim = AnimState.Idle;
-                            t.Set("immune", ThawImmune);
-                            Emit(new Effect(EffectKind.Thaw, t.Pos.X, t.Pos.Y));
-                        }
                     }
                 }
             }

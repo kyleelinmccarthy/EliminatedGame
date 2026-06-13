@@ -137,6 +137,42 @@ namespace Eliminated.Sim.Tests.Room
         }
 
         [Fact]
+        public void Casual_respawn_keeps_each_actor_character_stable_every_round()
+        {
+            // Repro probe for "in casual it loads me as a different character after I die":
+            // a human's per-round in-arena Actor must carry their persistent Player.CharacterId
+            // EVERY round, including the casual respawn after they were eliminated. Also asserts
+            // it for the bots, so a reordering/identity-shuffle bug can't hide behind the human.
+            var r = Room(seed: 11);
+            r.UpdateConfig(new RoomConfig { Mode = SeriesMode.Casual, Rounds = RoundsMode.Fixed(6) });
+            r.AddPlayer(new Player("local0", "You", "avo", isBot: false));
+            Assert.True(r.StartSeries());
+
+            // The character each id was created with (humans + bot-fill), captured once.
+            var expected = r.Players.ToDictionary(p => p.Id, p => p.CharacterId);
+
+            int lastRound = -1, roundsSeen = 0;
+            for (int i = 0; i < 800_000 && r.Phase != RoomPhase.SeriesResult && r.Phase != RoomPhase.Lobby; i++)
+            {
+                if (r.Phase == RoomPhase.Playing && r.RoundIndex != lastRound)
+                {
+                    lastRound = r.RoundIndex;
+                    roundsSeen++;
+                    var snap = r.BuildSnapshot();
+                    Assert.NotNull(snap?.Actors);
+                    var mine = snap.Actors.FirstOrDefault(a => a.Id == "local0");
+                    Assert.NotNull(mine); // the human must be in the arena every casual round
+                    Assert.Equal("avo", mine.CharacterId);
+                    foreach (var a in snap.Actors)
+                        if (expected.TryGetValue(a.Id, out var ch))
+                            Assert.Equal(ch, a.CharacterId);
+                }
+                r.Tick(Constants.Dt);
+            }
+            Assert.True(roundsSeen >= 3, $"only saw {roundsSeen} rounds");
+        }
+
+        [Fact]
         public void Final_game_flag_marks_only_the_last_scheduled_round()
         {
             // IsFinalGame drives the finale music + "The final game…" announcer, online

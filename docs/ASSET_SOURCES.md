@@ -123,20 +123,25 @@ The web build's robotic Game Master (`lib/client/audio.ts` → browser
 `speechSynthesis`) — a **male** announcer revealing each game and barking Simon
 Says orders, a **female** voice calling eliminations — is reproduced for Unity,
 which has no built-in speech synth. Instead of speaking at runtime we pre-render a
-small fixed vocabulary **once** with **espeak-ng** (the classic offline formant
-synthesizer — exactly the robotic PA timbre we want) and ship the 46 clips under
-`Resources/Audio/voice/`. At runtime `Announcer` stitches them — e.g. `game_03` +
-`name_tugofwar` = "Game three. Tug of war." — and `AudioService.Speak` plays them
-gaplessly on a dedicated voice pool. Regenerate with (espeak-ng must be on PATH):
+small fixed vocabulary **once** with **Piper** (neural TTS) and ship the 67 clips
+under `Resources/Audio/voice/`. The shipped voices are **CC0 / public-domain**
+models so they are safe for a commercial build: male announcer = **`norman`**
+(public domain), female (eliminations) = **`ljspeech`** (public domain). At runtime
+`Announcer` stitches them — e.g. `game_03` + `name_tugofwar` = "Game three. Tug of
+war." — and `AudioService.Speak` plays them gaplessly on a dedicated voice pool.
+Regenerate by pointing the env vars at a Piper binary + the two `.onnx` voices:
 
 ```bash
-dotnet run --project tools/VoiceGen -- unity/EliminatedGame/Assets/Eliminated/Resources/Audio/voice
+PIPER_BIN=… PIPER_MALE=…/norman.onnx PIPER_FEMALE=…/en_US-ljspeech-medium.onnx \
+  dotnet run --project tools/VoiceGen -- unity/EliminatedGame/Assets/Eliminated/Resources/Audio/voice
 ```
 
-`espeak-ng` (GPLv3) is a **build-time tool only** — not a runtime or Unity
-dependency. Speech-synth output is the user's own data, not a derivative of the
-synthesizer, so the generated WAVs inherit no license (see
-`Resources/Audio/voice/VOICE_MANIFEST.md`). The finale reveal ("The final game. …")
+(`espeak-ng` is the no-env fallback engine — robotic formant synth — when those
+vars are unset.) The TTS engine is a **build-time tool only** — not a runtime or
+Unity dependency. Speech-synth output is the user's own data, not a derivative of
+the synthesizer; only ship CC0 / public-domain voice models (NOT the CC BY-NC ones
+like `ryan`/`hfc`/`lessac`). See `Resources/Audio/voice/VOICE_MANIFEST.md`. The
+finale reveal ("The final game. …")
 fires online too — the server sends a mystery-safe `finalGame` flag in the room
 message (see the finale-music note below).
 

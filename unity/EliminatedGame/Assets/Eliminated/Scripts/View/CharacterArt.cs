@@ -63,21 +63,27 @@ namespace Eliminated.Game.View
         // real face sprite — so glasses fit every character's own eye placement and spacing, with
         // no hand-tuned numbers. Detected against the same texture region the preview draws into
         // the face box (matches DrawThumbInRect's Uv), so it lines up with the on-screen face.
-        private static readonly Dictionary<string, (Vector2 L, Vector2 R, float rad)?> _eyeCache =
-            new Dictionary<string, (Vector2 L, Vector2 R, float rad)?>();
+        private static readonly Dictionary<string, (Vector2 L, Vector2 R, float rad, bool tight)?> _eyeCache =
+            new Dictionary<string, (Vector2 L, Vector2 R, float rad, bool tight)?>();
 
         // eL/eR: eye centres in face-box Norm (Y-up). eyeRad: average eye radius as a fraction of
         // the face-box width — so the glasses lenses can be sized to the character's actual eyes.
         public static bool TryEyes(string id, out Vector2 eL, out Vector2 eR, out float eyeRad)
+            => TryEyes(id, out eL, out eR, out eyeRad, out _);
+
+        // tightFace: true when the character has a real Face/Head part (so the face box is the actual
+        // face); false for single-sprite "blob" characters whose face box is a loose body-fraction
+        // default — eyewear sizing uses this to pick a sensible lens-size floor (see DrawFittedEyewear).
+        public static bool TryEyes(string id, out Vector2 eL, out Vector2 eR, out float eyeRad, out bool tightFace)
         {
-            eL = eR = default; eyeRad = 0.18f;
+            eL = eR = default; eyeRad = 0.18f; tightFace = true;
             if (string.IsNullOrEmpty(id)) return false;
             if (!_eyeCache.TryGetValue(id, out var c)) { c = DetectEyes(id); _eyeCache[id] = c; }
             if (c == null) return false;
-            eL = c.Value.L; eR = c.Value.R; eyeRad = c.Value.rad; return true;
+            eL = c.Value.L; eR = c.Value.R; eyeRad = c.Value.rad; tightFace = c.Value.tight; return true;
         }
 
-        private static (Vector2 L, Vector2 R, float rad)? DetectEyes(string id)
+        private static (Vector2 L, Vector2 R, float rad, bool tight)? DetectEyes(string id)
         {
             var prefab = Load(id);
             if (prefab == null) return null;
@@ -168,7 +174,7 @@ namespace Eliminated.Game.View
                 eR2 = new Vector2((eR2.x - 0.15f) / 0.70f, (eR2.y - 0.45f) / 0.50f);
                 rad /= 0.70f;
             }
-            return (eL2, eR2, rad);
+            return (eL2, eR2, rad, !noFace);
         }
 
         /// <summary>The art prefab for a character, or null if it has none (→ player).</summary>

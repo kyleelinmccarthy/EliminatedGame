@@ -80,6 +80,28 @@ namespace Eliminated.Sim.Tests.Games
         }
 
         [Fact]
+        public void A_rescuer_thaws_even_while_a_chasing_freezer_catches_them()
+        {
+            // Running over a frozen ally must FREE them even if a freezer is right on the
+            // rescuer's tail — thaw resolves before freeze, so the rescue lands and the
+            // rescuer (not the saved ally) is the one who may get caught. Previously the
+            // freeze pass ran first and froze the rescuer, so the thaw silently did nothing.
+            var (g, actors) = Make(12, 0, seed: 2);
+            var freezers = actors.Where(a => a.Team == Freezer).ToList();
+            var runners = actors.Where(a => a.Team == Runner).ToList();
+            freezers[1].Pos = new Vec2(1240, 700);          // park the second hunter far off
+            var victim = runners[0]; victim.Frozen = true; victim.Pos = new Vec2(400, 300);
+            var rescuer = runners[1]; rescuer.Pos = new Vec2(380, 300); // overlapping the victim
+            var chaser = freezers[0]; chaser.Pos = new Vec2(360, 300);  // right on the rescuer
+            for (int i = 2; i < runners.Count; i++) runners[i].Pos = new Vec2(100, 50 + i * 10);
+
+            g.Tick(Constants.Dt);
+
+            Assert.False(victim.Frozen);  // rescue landed despite the chaser
+            Assert.True(rescuer.Frozen);  // ...and the brave rescuer paid for it
+        }
+
+        [Fact]
         public void A_runner_bot_proactively_thaws_a_frozen_teammate()
         {
             // The whole point of Freeze Tag — a free runner should GO thaw a frozen friend when the
