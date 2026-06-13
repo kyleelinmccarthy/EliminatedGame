@@ -41,9 +41,12 @@ namespace Eliminated.Sim.Tests.Economy
         }
 
         [Fact]
-        public void Champion_bonus_is_300()
+        public void Champion_bonus_is_a_modest_top_up()
         {
-            Assert.Equal(300, Marbles.ChampionBonus);
+            // Kept small on purpose: the champion already out-earns the field via
+            // round wins + the top placement bonus, so the series win shouldn't
+            // also drop a huge flat bonus on top.
+            Assert.Equal(100, Marbles.ChampionBonus);
         }
     }
 }

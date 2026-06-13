@@ -87,6 +87,19 @@ namespace Eliminated.Tools.VoiceGen
             public Spec(string key, string text, V voice) { Key = key; Text = text; Voice = voice; }
         }
 
+        private const int MaxPlayerTag = 456; // mirrors GameRoom.MaxPlayerNumber (the 1..456 lobby tag range)
+        private static readonly string[] Digit =
+            { "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine" };
+
+        // Spell a tag out digit by digit: 573 → "five seven three", 102 → "one zero two".
+        private static string SpellDigits(int n)
+        {
+            string s = n.ToString();
+            var parts = new string[s.Length];
+            for (int i = 0; i < s.Length; i++) parts[i] = Digit[s[i] - '0'];
+            return string.Join(" ", parts);
+        }
+
         private static List<Spec> BuildSpecs()
         {
             var list = new List<Spec>();
@@ -153,16 +166,18 @@ namespace Eliminated.Tools.VoiceGen
             list.Add(new Spec("elim_player", "Player eliminated.", V.Female));
             list.Add(new Spec("elim_players", "Players eliminated.", V.Female));
 
-            // --- Female voice: per-player elimination, read DIGIT BY DIGIT ----------
-            // Player tags are spoken Squid-Game style — "Player five seven three has been
-            // eliminated." — stitched at runtime (Announcer.cs) from ten digit clips, so any
-            // tag works and the call stays short. Bare words (no full stop) so they flow;
-            // "has been eliminated." carries the close. Plural form for a same-tick wipe:
-            // "Players five seven three, one two … have been eliminated."
+            // --- Female voice: per-player elimination, WHOLE TAG per clip -----------
+            // Each player tag 1..456 is its OWN clip, rendered as one utterance read digit by
+            // digit ("five seven three" for 573), so the digits flow as a single number with
+            // natural intonation. That coherent fall-at-the-end is what lets a wipe list tags
+            // back to back — "Players five seven three, one two, four oh six, have been
+            // eliminated." — and stay distinguishable WITHOUT prefixing "Player" each time
+            // (isolated digit clips were a flat, unparseable stream). Bare (no full stop) so a
+            // tag flows into the verdict; Announcer.cs stitches player/verdict around it.
             list.Add(new Spec("num_player", "Player", V.Female));
             list.Add(new Spec("num_players", "Players", V.Female));
-            for (int d = 0; d <= 9; d++)
-                list.Add(new Spec($"num_{d}", ones[d], V.Female)); // ones[0..9] = "zero".."nine"
+            for (int n = 1; n <= MaxPlayerTag; n++)
+                list.Add(new Spec($"num_{n}", SpellDigits(n), V.Female));
             list.Add(new Spec("num_elim", "has been eliminated.", V.Female));
             list.Add(new Spec("num_elim_plural", "have been eliminated.", V.Female));
 

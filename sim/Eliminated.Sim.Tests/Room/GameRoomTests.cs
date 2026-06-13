@@ -219,10 +219,10 @@ namespace Eliminated.Sim.Tests.Room
         }
 
         [Fact]
-        public void A_round_awards_marbles_to_the_living_and_a_consolation_to_the_dead()
+        public void A_casual_round_awards_marbles_to_the_living_and_a_consolation_to_the_dead()
         {
             var r = Room(seed: 21);
-            r.UpdateConfig(new RoomConfig { Mode = SeriesMode.Hardcore, Rounds = RoundsMode.Fixed(3) });
+            r.UpdateConfig(new RoomConfig { Mode = SeriesMode.Casual, Rounds = RoundsMode.Fixed(3) });
             r.AddPlayer(Human("p1"));
             r.StartSeries();
 
@@ -234,6 +234,31 @@ namespace Eliminated.Sim.Tests.Room
                     Assert.True(e.MarblesEarned >= Marbles_SurvivePerRound());
                 else
                     Assert.Equal(Marbles_ElimParticipation(), e.MarblesEarned);
+            }
+        }
+
+        [Fact]
+        public void Hardcore_eliminated_bank_nothing_and_only_the_survivor_cashes_out()
+        {
+            var r = Room(seed: 21);
+            r.UpdateConfig(new RoomConfig { Mode = SeriesMode.Hardcore, Rounds = RoundsMode.Fixed(3) });
+            r.AddPlayer(Human("p1"));
+            r.StartSeries();
+
+            // Per round: the eliminated earn nothing in Hardcore (no consolation).
+            Assert.True(RunUntil(r, () => r.LastRoundReport != null));
+            foreach (var e in r.LastRoundReport.Entries)
+                if (!e.Survived) Assert.Equal(0, e.MarblesEarned);
+
+            // At series end: only the last player standing keeps any Marbles;
+            // everyone who was eliminated forfeits the running tally to zero.
+            Assert.True(RunUntil(r, () => r.Phase == RoomPhase.SeriesResult));
+            var sr = r.SeriesResult;
+            Assert.NotNull(sr.ChampionId);
+            foreach (var s in sr.Standings)
+            {
+                if (s.PlayerId == sr.ChampionId) Assert.True(s.Marbles > 0);
+                else Assert.Equal(0, s.Marbles);
             }
         }
 

@@ -366,7 +366,10 @@ namespace Eliminated.Sim.Room
                 }
                 else
                 {
-                    marbles = Marbles.ElimParticipation;
+                    // Hardcore: elimination pays nothing — the dead leave broke
+                    // (a Dead Pool wager is their only way back into the black).
+                    // Casual still hands out a small consolation for the round.
+                    marbles = Config.Mode == SeriesMode.Hardcore ? 0 : Marbles.ElimParticipation;
                     p.Score += Math.Max(0, _participants.Count - placement) * 4;
                     if (Config.Mode == SeriesMode.Hardcore) p.AliveInSeries = false;
                 }
@@ -417,10 +420,22 @@ namespace Eliminated.Sim.Room
             {
                 var p = all[i];
                 int placement = i + 1;
-                int bonus = Marbles.PlacementBonus(placement);
                 bool isChampion = placement == 1 && (Config.Mode != SeriesMode.Hardcore || p.AliveInSeries);
-                if (isChampion) bonus += Marbles.ChampionBonus;
-                p.MarblesEarned += bonus;
+
+                if (Config.Mode == SeriesMode.Hardcore && !isChampion)
+                {
+                    // Hardcore forfeit: anyone who was eliminated banks nothing,
+                    // wiping the running tally they built up while still alive.
+                    // Only the last player standing cashes out the run.
+                    p.MarblesEarned = 0;
+                }
+                else
+                {
+                    int bonus = Marbles.PlacementBonus(placement);
+                    if (isChampion) bonus += Marbles.ChampionBonus;
+                    p.MarblesEarned += bonus;
+                }
+
                 p.Title = Marbles.PlacementTitle(placement);
                 standings.Add(new SeriesStanding
                 {

@@ -23,6 +23,7 @@ namespace Eliminated.Game.Audio
         // but stays below ElimVolume so her elimination calls remain the loudest cue.
         private const float RevealVolume = 1.15f;
         private const int MaxNamed = 6;
+        private const int MaxPlayerTag = 456; // tag range with a baked num_<n> clip (mirrors GameRoom)
 
         /// <summary>Male ceremonial reveal: "Attention, players. Game N. &lt;game name&gt;. The arena,
         /// &lt;room&gt;." (or "…The final game. …"). A Squid-Game-style PA: the "Attention, players."
@@ -39,36 +40,35 @@ namespace Eliminated.Game.Audio
             AudioService.Instance?.Speak(line, RevealVolume);
         }
 
-        /// <summary>Female elimination call, by the eliminated player's lobby number, read
-        /// DIGIT BY DIGIT: "Player five seven three has been eliminated." Stitched at runtime
-        /// from ten digit clips so any tag speaks without a phrase per number. Returns the
-        /// spoken line's length in seconds (so the caller can hold off the next call until
-        /// it finishes). <paramref name="number"/> ≤ 0 (unknown) → generic "Player eliminated."</summary>
+        /// <summary>Female elimination call, by the eliminated player's lobby tag: "Player five
+        /// seven three has been eliminated." Each tag 1..456 is its OWN clip (read digit by digit
+        /// as one utterance), so the number has natural intonation. Returns the spoken line's
+        /// length in seconds (so the caller can hold off the next call until it finishes). A tag
+        /// outside 1..<see cref="MaxPlayerTag"/> → generic "Player eliminated."</summary>
         public static float EliminatedByNumber(int number)
         {
-            if (number <= 0) return AudioService.Instance?.Speak(new[] { Dir + "elim_player" }, ElimVolume) ?? 0f;
-            var line = new List<string>(8) { Dir + "num_player" };
-            AppendNumberWords(line, number);
-            line.Add(Dir + "num_elim");
+            if (number < 1 || number > MaxPlayerTag) return AudioService.Instance?.Speak(new[] { Dir + "elim_player" }, ElimVolume) ?? 0f;
+            var line = new List<string> { Dir + "num_player", Dir + "num_" + number, Dir + "num_elim" };
             return AudioService.Instance?.Speak(line, ElimVolume) ?? 0f;
         }
 
-        /// <summary>Female call for a same-tick wipe, enumerated by number:
-        /// "Players five seven three, one two — &lt;beat&gt; — have been eliminated." A "@ms"
-        /// beat separates each tag and a longer one sets up the verdict (see AudioService.Speak).
-        /// Returns the spoken line's length in seconds. An unknown tag or an oversized wipe
-        /// (&gt; <see cref="MaxNamed"/>) falls back to the generic plural.</summary>
+        /// <summary>Female call for a same-tick wipe: "Players five seven three, one two, four oh
+        /// six … have been eliminated." One "Players" opener, then each tag as its own clip with a
+        /// breath between — because each tag is a whole, coherently-intoned number (a natural fall
+        /// at its end), the pause alone keeps them distinct, the way the Squid-Game PA reads a list
+        /// (no need to repeat "Player"). Returns the spoken line's length in seconds. An unknown tag
+        /// or an oversized wipe (&gt; <see cref="MaxNamed"/>) falls back to the generic plural.</summary>
         public static float EliminatedMultiple(IReadOnlyList<int> numbers)
         {
             if (numbers == null || numbers.Count == 0) return EliminatedMany();
             if (numbers.Count == 1) return EliminatedByNumber(numbers[0]);
             if (numbers.Count > MaxNamed) return EliminatedMany();
-            var line = new List<string>(numbers.Count * 6 + 3) { Dir + "num_players" };
+            var line = new List<string>(numbers.Count * 2 + 3) { Dir + "num_players" };
             for (int i = 0; i < numbers.Count; i++)
             {
-                if (numbers[i] <= 0) return EliminatedMany();
-                if (i > 0) line.Add("@250"); // comma beat between names
-                AppendNumberWords(line, numbers[i]);
+                if (numbers[i] < 1 || numbers[i] > MaxPlayerTag) return EliminatedMany();
+                if (i > 0) line.Add("@330");          // breath between tags (each is its own clip)
+                line.Add(Dir + "num_" + numbers[i]);
             }
             line.Add("@350"); // a beat before the verdict
             line.Add(Dir + "num_elim_plural");
@@ -77,19 +77,6 @@ namespace Eliminated.Game.Audio
 
         /// <summary>Female call for a wipe too large to name: "Players eliminated."</summary>
         public static float EliminatedMany() => AudioService.Instance?.Speak(new[] { Dir + "elim_players" }, ElimVolume) ?? 0f;
-
-        // Spell the tag out digit by digit ("573" → num_5 @ num_7 @ num_3), with a short beat
-        // between digits so they stay distinct ("five‑seven‑three"). n is ≥ 1 here, so the
-        // decimal string never has a leading zero.
-        private static void AppendNumberWords(List<string> line, int n)
-        {
-            string s = n.ToString();
-            for (int i = 0; i < s.Length; i++)
-            {
-                if (i > 0) line.Add("@80");         // small beat between digits ("five‑seven‑three")
-                line.Add(Dir + "num_" + s[i]);      // s[i] is '0'..'9' → num_0..num_9
-            }
-        }
 
         /// <summary>Male Simon Says order. <paramref name="command"/> is the sim key
         /// (head/nose/blink/flip/jump); freeze plays the bespoke "Freeze!" line.</summary>

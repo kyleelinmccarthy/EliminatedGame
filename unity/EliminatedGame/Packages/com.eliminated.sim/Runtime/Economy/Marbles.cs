@@ -12,7 +12,10 @@ namespace Eliminated.Sim.Economy
         public const int ElimParticipation = 5;  // consolation for the eliminated
 
         // ── Series payouts ───────────────────────────────────────────────
-        public const int ChampionBonus = 300;    // series winner (hardcore)
+        // Winning the series should feel good without dwarfing the field: the
+        // champion already out-earns everyone via round wins + the top placement
+        // bonus, so this top-up stays modest (≈ one extra round win).
+        public const int ChampionBonus = 100;    // series winner
 
         /// <summary>Series placement bonus for 1st..5th. Beyond 5th = 0.</summary>
         public static readonly int[] PlacementCurve = { 200, 120, 80, 50, 30 };

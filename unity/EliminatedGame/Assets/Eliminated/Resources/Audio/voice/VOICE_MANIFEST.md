@@ -4,7 +4,7 @@ Announcer voicelines rendered offline with **Piper** (neural TTS, a build-time
 tool — not a runtime/Unity dependency), for natural near-web quality. The game
 plays/queues these WAVs at runtime (see `Scripts/Audio/Announcer.cs`).
 
-- male announcer  : `norman.onnx`
+- male announcer  : `en_US-joe-medium.onnx`
 - female announcer: `en_US-ljspeech-medium.onnx`
 - **Ship only CC0 / public-domain voices** (e.g. en_US-joe = CC0, en_US-kristin =
   public domain). Record the chosen voices + licenses in `docs/ASSET_SOURCES.md`.
@@ -67,7 +67,6 @@ plays/queues these WAVs at runtime (see `Scripts/Audio/Announcer.cs`).
 - `elim_players.wav` — [F] “Players eliminated.”
 - `num_player.wav` — [F] “Player”
 - `num_players.wav` — [F] “Players”
-- `num_0.wav` — [F] “zero”
 - `num_1.wav` — [F] “one”
 - `num_2.wav` — [F] “two”
 - `num_3.wav` — [F] “three”
@@ -77,5 +76,452 @@ plays/queues these WAVs at runtime (see `Scripts/Audio/Announcer.cs`).
 - `num_7.wav` — [F] “seven”
 - `num_8.wav` — [F] “eight”
 - `num_9.wav` — [F] “nine”
+- `num_10.wav` — [F] “one zero”
+- `num_11.wav` — [F] “one one”
+- `num_12.wav` — [F] “one two”
+- `num_13.wav` — [F] “one three”
+- `num_14.wav` — [F] “one four”
+- `num_15.wav` — [F] “one five”
+- `num_16.wav` — [F] “one six”
+- `num_17.wav` — [F] “one seven”
+- `num_18.wav` — [F] “one eight”
+- `num_19.wav` — [F] “one nine”
+- `num_20.wav` — [F] “two zero”
+- `num_21.wav` — [F] “two one”
+- `num_22.wav` — [F] “two two”
+- `num_23.wav` — [F] “two three”
+- `num_24.wav` — [F] “two four”
+- `num_25.wav` — [F] “two five”
+- `num_26.wav` — [F] “two six”
+- `num_27.wav` — [F] “two seven”
+- `num_28.wav` — [F] “two eight”
+- `num_29.wav` — [F] “two nine”
+- `num_30.wav` — [F] “three zero”
+- `num_31.wav` — [F] “three one”
+- `num_32.wav` — [F] “three two”
+- `num_33.wav` — [F] “three three”
+- `num_34.wav` — [F] “three four”
+- `num_35.wav` — [F] “three five”
+- `num_36.wav` — [F] “three six”
+- `num_37.wav` — [F] “three seven”
+- `num_38.wav` — [F] “three eight”
+- `num_39.wav` — [F] “three nine”
+- `num_40.wav` — [F] “four zero”
+- `num_41.wav` — [F] “four one”
+- `num_42.wav` — [F] “four two”
+- `num_43.wav` — [F] “four three”
+- `num_44.wav` — [F] “four four”
+- `num_45.wav` — [F] “four five”
+- `num_46.wav` — [F] “four six”
+- `num_47.wav` — [F] “four seven”
+- `num_48.wav` — [F] “four eight”
+- `num_49.wav` — [F] “four nine”
+- `num_50.wav` — [F] “five zero”
+- `num_51.wav` — [F] “five one”
+- `num_52.wav` — [F] “five two”
+- `num_53.wav` — [F] “five three”
+- `num_54.wav` — [F] “five four”
+- `num_55.wav` — [F] “five five”
+- `num_56.wav` — [F] “five six”
+- `num_57.wav` — [F] “five seven”
+- `num_58.wav` — [F] “five eight”
+- `num_59.wav` — [F] “five nine”
+- `num_60.wav` — [F] “six zero”
+- `num_61.wav` — [F] “six one”
+- `num_62.wav` — [F] “six two”
+- `num_63.wav` — [F] “six three”
+- `num_64.wav` — [F] “six four”
+- `num_65.wav` — [F] “six five”
+- `num_66.wav` — [F] “six six”
+- `num_67.wav` — [F] “six seven”
+- `num_68.wav` — [F] “six eight”
+- `num_69.wav` — [F] “six nine”
+- `num_70.wav` — [F] “seven zero”
+- `num_71.wav` — [F] “seven one”
+- `num_72.wav` — [F] “seven two”
+- `num_73.wav` — [F] “seven three”
+- `num_74.wav` — [F] “seven four”
+- `num_75.wav` — [F] “seven five”
+- `num_76.wav` — [F] “seven six”
+- `num_77.wav` — [F] “seven seven”
+- `num_78.wav` — [F] “seven eight”
+- `num_79.wav` — [F] “seven nine”
+- `num_80.wav` — [F] “eight zero”
+- `num_81.wav` — [F] “eight one”
+- `num_82.wav` — [F] “eight two”
+- `num_83.wav` — [F] “eight three”
+- `num_84.wav` — [F] “eight four”
+- `num_85.wav` — [F] “eight five”
+- `num_86.wav` — [F] “eight six”
+- `num_87.wav` — [F] “eight seven”
+- `num_88.wav` — [F] “eight eight”
+- `num_89.wav` — [F] “eight nine”
+- `num_90.wav` — [F] “nine zero”
+- `num_91.wav` — [F] “nine one”
+- `num_92.wav` — [F] “nine two”
+- `num_93.wav` — [F] “nine three”
+- `num_94.wav` — [F] “nine four”
+- `num_95.wav` — [F] “nine five”
+- `num_96.wav` — [F] “nine six”
+- `num_97.wav` — [F] “nine seven”
+- `num_98.wav` — [F] “nine eight”
+- `num_99.wav` — [F] “nine nine”
+- `num_100.wav` — [F] “one zero zero”
+- `num_101.wav` — [F] “one zero one”
+- `num_102.wav` — [F] “one zero two”
+- `num_103.wav` — [F] “one zero three”
+- `num_104.wav` — [F] “one zero four”
+- `num_105.wav` — [F] “one zero five”
+- `num_106.wav` — [F] “one zero six”
+- `num_107.wav` — [F] “one zero seven”
+- `num_108.wav` — [F] “one zero eight”
+- `num_109.wav` — [F] “one zero nine”
+- `num_110.wav` — [F] “one one zero”
+- `num_111.wav` — [F] “one one one”
+- `num_112.wav` — [F] “one one two”
+- `num_113.wav` — [F] “one one three”
+- `num_114.wav` — [F] “one one four”
+- `num_115.wav` — [F] “one one five”
+- `num_116.wav` — [F] “one one six”
+- `num_117.wav` — [F] “one one seven”
+- `num_118.wav` — [F] “one one eight”
+- `num_119.wav` — [F] “one one nine”
+- `num_120.wav` — [F] “one two zero”
+- `num_121.wav` — [F] “one two one”
+- `num_122.wav` — [F] “one two two”
+- `num_123.wav` — [F] “one two three”
+- `num_124.wav` — [F] “one two four”
+- `num_125.wav` — [F] “one two five”
+- `num_126.wav` — [F] “one two six”
+- `num_127.wav` — [F] “one two seven”
+- `num_128.wav` — [F] “one two eight”
+- `num_129.wav` — [F] “one two nine”
+- `num_130.wav` — [F] “one three zero”
+- `num_131.wav` — [F] “one three one”
+- `num_132.wav` — [F] “one three two”
+- `num_133.wav` — [F] “one three three”
+- `num_134.wav` — [F] “one three four”
+- `num_135.wav` — [F] “one three five”
+- `num_136.wav` — [F] “one three six”
+- `num_137.wav` — [F] “one three seven”
+- `num_138.wav` — [F] “one three eight”
+- `num_139.wav` — [F] “one three nine”
+- `num_140.wav` — [F] “one four zero”
+- `num_141.wav` — [F] “one four one”
+- `num_142.wav` — [F] “one four two”
+- `num_143.wav` — [F] “one four three”
+- `num_144.wav` — [F] “one four four”
+- `num_145.wav` — [F] “one four five”
+- `num_146.wav` — [F] “one four six”
+- `num_147.wav` — [F] “one four seven”
+- `num_148.wav` — [F] “one four eight”
+- `num_149.wav` — [F] “one four nine”
+- `num_150.wav` — [F] “one five zero”
+- `num_151.wav` — [F] “one five one”
+- `num_152.wav` — [F] “one five two”
+- `num_153.wav` — [F] “one five three”
+- `num_154.wav` — [F] “one five four”
+- `num_155.wav` — [F] “one five five”
+- `num_156.wav` — [F] “one five six”
+- `num_157.wav` — [F] “one five seven”
+- `num_158.wav` — [F] “one five eight”
+- `num_159.wav` — [F] “one five nine”
+- `num_160.wav` — [F] “one six zero”
+- `num_161.wav` — [F] “one six one”
+- `num_162.wav` — [F] “one six two”
+- `num_163.wav` — [F] “one six three”
+- `num_164.wav` — [F] “one six four”
+- `num_165.wav` — [F] “one six five”
+- `num_166.wav` — [F] “one six six”
+- `num_167.wav` — [F] “one six seven”
+- `num_168.wav` — [F] “one six eight”
+- `num_169.wav` — [F] “one six nine”
+- `num_170.wav` — [F] “one seven zero”
+- `num_171.wav` — [F] “one seven one”
+- `num_172.wav` — [F] “one seven two”
+- `num_173.wav` — [F] “one seven three”
+- `num_174.wav` — [F] “one seven four”
+- `num_175.wav` — [F] “one seven five”
+- `num_176.wav` — [F] “one seven six”
+- `num_177.wav` — [F] “one seven seven”
+- `num_178.wav` — [F] “one seven eight”
+- `num_179.wav` — [F] “one seven nine”
+- `num_180.wav` — [F] “one eight zero”
+- `num_181.wav` — [F] “one eight one”
+- `num_182.wav` — [F] “one eight two”
+- `num_183.wav` — [F] “one eight three”
+- `num_184.wav` — [F] “one eight four”
+- `num_185.wav` — [F] “one eight five”
+- `num_186.wav` — [F] “one eight six”
+- `num_187.wav` — [F] “one eight seven”
+- `num_188.wav` — [F] “one eight eight”
+- `num_189.wav` — [F] “one eight nine”
+- `num_190.wav` — [F] “one nine zero”
+- `num_191.wav` — [F] “one nine one”
+- `num_192.wav` — [F] “one nine two”
+- `num_193.wav` — [F] “one nine three”
+- `num_194.wav` — [F] “one nine four”
+- `num_195.wav` — [F] “one nine five”
+- `num_196.wav` — [F] “one nine six”
+- `num_197.wav` — [F] “one nine seven”
+- `num_198.wav` — [F] “one nine eight”
+- `num_199.wav` — [F] “one nine nine”
+- `num_200.wav` — [F] “two zero zero”
+- `num_201.wav` — [F] “two zero one”
+- `num_202.wav` — [F] “two zero two”
+- `num_203.wav` — [F] “two zero three”
+- `num_204.wav` — [F] “two zero four”
+- `num_205.wav` — [F] “two zero five”
+- `num_206.wav` — [F] “two zero six”
+- `num_207.wav` — [F] “two zero seven”
+- `num_208.wav` — [F] “two zero eight”
+- `num_209.wav` — [F] “two zero nine”
+- `num_210.wav` — [F] “two one zero”
+- `num_211.wav` — [F] “two one one”
+- `num_212.wav` — [F] “two one two”
+- `num_213.wav` — [F] “two one three”
+- `num_214.wav` — [F] “two one four”
+- `num_215.wav` — [F] “two one five”
+- `num_216.wav` — [F] “two one six”
+- `num_217.wav` — [F] “two one seven”
+- `num_218.wav` — [F] “two one eight”
+- `num_219.wav` — [F] “two one nine”
+- `num_220.wav` — [F] “two two zero”
+- `num_221.wav` — [F] “two two one”
+- `num_222.wav` — [F] “two two two”
+- `num_223.wav` — [F] “two two three”
+- `num_224.wav` — [F] “two two four”
+- `num_225.wav` — [F] “two two five”
+- `num_226.wav` — [F] “two two six”
+- `num_227.wav` — [F] “two two seven”
+- `num_228.wav` — [F] “two two eight”
+- `num_229.wav` — [F] “two two nine”
+- `num_230.wav` — [F] “two three zero”
+- `num_231.wav` — [F] “two three one”
+- `num_232.wav` — [F] “two three two”
+- `num_233.wav` — [F] “two three three”
+- `num_234.wav` — [F] “two three four”
+- `num_235.wav` — [F] “two three five”
+- `num_236.wav` — [F] “two three six”
+- `num_237.wav` — [F] “two three seven”
+- `num_238.wav` — [F] “two three eight”
+- `num_239.wav` — [F] “two three nine”
+- `num_240.wav` — [F] “two four zero”
+- `num_241.wav` — [F] “two four one”
+- `num_242.wav` — [F] “two four two”
+- `num_243.wav` — [F] “two four three”
+- `num_244.wav` — [F] “two four four”
+- `num_245.wav` — [F] “two four five”
+- `num_246.wav` — [F] “two four six”
+- `num_247.wav` — [F] “two four seven”
+- `num_248.wav` — [F] “two four eight”
+- `num_249.wav` — [F] “two four nine”
+- `num_250.wav` — [F] “two five zero”
+- `num_251.wav` — [F] “two five one”
+- `num_252.wav` — [F] “two five two”
+- `num_253.wav` — [F] “two five three”
+- `num_254.wav` — [F] “two five four”
+- `num_255.wav` — [F] “two five five”
+- `num_256.wav` — [F] “two five six”
+- `num_257.wav` — [F] “two five seven”
+- `num_258.wav` — [F] “two five eight”
+- `num_259.wav` — [F] “two five nine”
+- `num_260.wav` — [F] “two six zero”
+- `num_261.wav` — [F] “two six one”
+- `num_262.wav` — [F] “two six two”
+- `num_263.wav` — [F] “two six three”
+- `num_264.wav` — [F] “two six four”
+- `num_265.wav` — [F] “two six five”
+- `num_266.wav` — [F] “two six six”
+- `num_267.wav` — [F] “two six seven”
+- `num_268.wav` — [F] “two six eight”
+- `num_269.wav` — [F] “two six nine”
+- `num_270.wav` — [F] “two seven zero”
+- `num_271.wav` — [F] “two seven one”
+- `num_272.wav` — [F] “two seven two”
+- `num_273.wav` — [F] “two seven three”
+- `num_274.wav` — [F] “two seven four”
+- `num_275.wav` — [F] “two seven five”
+- `num_276.wav` — [F] “two seven six”
+- `num_277.wav` — [F] “two seven seven”
+- `num_278.wav` — [F] “two seven eight”
+- `num_279.wav` — [F] “two seven nine”
+- `num_280.wav` — [F] “two eight zero”
+- `num_281.wav` — [F] “two eight one”
+- `num_282.wav` — [F] “two eight two”
+- `num_283.wav` — [F] “two eight three”
+- `num_284.wav` — [F] “two eight four”
+- `num_285.wav` — [F] “two eight five”
+- `num_286.wav` — [F] “two eight six”
+- `num_287.wav` — [F] “two eight seven”
+- `num_288.wav` — [F] “two eight eight”
+- `num_289.wav` — [F] “two eight nine”
+- `num_290.wav` — [F] “two nine zero”
+- `num_291.wav` — [F] “two nine one”
+- `num_292.wav` — [F] “two nine two”
+- `num_293.wav` — [F] “two nine three”
+- `num_294.wav` — [F] “two nine four”
+- `num_295.wav` — [F] “two nine five”
+- `num_296.wav` — [F] “two nine six”
+- `num_297.wav` — [F] “two nine seven”
+- `num_298.wav` — [F] “two nine eight”
+- `num_299.wav` — [F] “two nine nine”
+- `num_300.wav` — [F] “three zero zero”
+- `num_301.wav` — [F] “three zero one”
+- `num_302.wav` — [F] “three zero two”
+- `num_303.wav` — [F] “three zero three”
+- `num_304.wav` — [F] “three zero four”
+- `num_305.wav` — [F] “three zero five”
+- `num_306.wav` — [F] “three zero six”
+- `num_307.wav` — [F] “three zero seven”
+- `num_308.wav` — [F] “three zero eight”
+- `num_309.wav` — [F] “three zero nine”
+- `num_310.wav` — [F] “three one zero”
+- `num_311.wav` — [F] “three one one”
+- `num_312.wav` — [F] “three one two”
+- `num_313.wav` — [F] “three one three”
+- `num_314.wav` — [F] “three one four”
+- `num_315.wav` — [F] “three one five”
+- `num_316.wav` — [F] “three one six”
+- `num_317.wav` — [F] “three one seven”
+- `num_318.wav` — [F] “three one eight”
+- `num_319.wav` — [F] “three one nine”
+- `num_320.wav` — [F] “three two zero”
+- `num_321.wav` — [F] “three two one”
+- `num_322.wav` — [F] “three two two”
+- `num_323.wav` — [F] “three two three”
+- `num_324.wav` — [F] “three two four”
+- `num_325.wav` — [F] “three two five”
+- `num_326.wav` — [F] “three two six”
+- `num_327.wav` — [F] “three two seven”
+- `num_328.wav` — [F] “three two eight”
+- `num_329.wav` — [F] “three two nine”
+- `num_330.wav` — [F] “three three zero”
+- `num_331.wav` — [F] “three three one”
+- `num_332.wav` — [F] “three three two”
+- `num_333.wav` — [F] “three three three”
+- `num_334.wav` — [F] “three three four”
+- `num_335.wav` — [F] “three three five”
+- `num_336.wav` — [F] “three three six”
+- `num_337.wav` — [F] “three three seven”
+- `num_338.wav` — [F] “three three eight”
+- `num_339.wav` — [F] “three three nine”
+- `num_340.wav` — [F] “three four zero”
+- `num_341.wav` — [F] “three four one”
+- `num_342.wav` — [F] “three four two”
+- `num_343.wav` — [F] “three four three”
+- `num_344.wav` — [F] “three four four”
+- `num_345.wav` — [F] “three four five”
+- `num_346.wav` — [F] “three four six”
+- `num_347.wav` — [F] “three four seven”
+- `num_348.wav` — [F] “three four eight”
+- `num_349.wav` — [F] “three four nine”
+- `num_350.wav` — [F] “three five zero”
+- `num_351.wav` — [F] “three five one”
+- `num_352.wav` — [F] “three five two”
+- `num_353.wav` — [F] “three five three”
+- `num_354.wav` — [F] “three five four”
+- `num_355.wav` — [F] “three five five”
+- `num_356.wav` — [F] “three five six”
+- `num_357.wav` — [F] “three five seven”
+- `num_358.wav` — [F] “three five eight”
+- `num_359.wav` — [F] “three five nine”
+- `num_360.wav` — [F] “three six zero”
+- `num_361.wav` — [F] “three six one”
+- `num_362.wav` — [F] “three six two”
+- `num_363.wav` — [F] “three six three”
+- `num_364.wav` — [F] “three six four”
+- `num_365.wav` — [F] “three six five”
+- `num_366.wav` — [F] “three six six”
+- `num_367.wav` — [F] “three six seven”
+- `num_368.wav` — [F] “three six eight”
+- `num_369.wav` — [F] “three six nine”
+- `num_370.wav` — [F] “three seven zero”
+- `num_371.wav` — [F] “three seven one”
+- `num_372.wav` — [F] “three seven two”
+- `num_373.wav` — [F] “three seven three”
+- `num_374.wav` — [F] “three seven four”
+- `num_375.wav` — [F] “three seven five”
+- `num_376.wav` — [F] “three seven six”
+- `num_377.wav` — [F] “three seven seven”
+- `num_378.wav` — [F] “three seven eight”
+- `num_379.wav` — [F] “three seven nine”
+- `num_380.wav` — [F] “three eight zero”
+- `num_381.wav` — [F] “three eight one”
+- `num_382.wav` — [F] “three eight two”
+- `num_383.wav` — [F] “three eight three”
+- `num_384.wav` — [F] “three eight four”
+- `num_385.wav` — [F] “three eight five”
+- `num_386.wav` — [F] “three eight six”
+- `num_387.wav` — [F] “three eight seven”
+- `num_388.wav` — [F] “three eight eight”
+- `num_389.wav` — [F] “three eight nine”
+- `num_390.wav` — [F] “three nine zero”
+- `num_391.wav` — [F] “three nine one”
+- `num_392.wav` — [F] “three nine two”
+- `num_393.wav` — [F] “three nine three”
+- `num_394.wav` — [F] “three nine four”
+- `num_395.wav` — [F] “three nine five”
+- `num_396.wav` — [F] “three nine six”
+- `num_397.wav` — [F] “three nine seven”
+- `num_398.wav` — [F] “three nine eight”
+- `num_399.wav` — [F] “three nine nine”
+- `num_400.wav` — [F] “four zero zero”
+- `num_401.wav` — [F] “four zero one”
+- `num_402.wav` — [F] “four zero two”
+- `num_403.wav` — [F] “four zero three”
+- `num_404.wav` — [F] “four zero four”
+- `num_405.wav` — [F] “four zero five”
+- `num_406.wav` — [F] “four zero six”
+- `num_407.wav` — [F] “four zero seven”
+- `num_408.wav` — [F] “four zero eight”
+- `num_409.wav` — [F] “four zero nine”
+- `num_410.wav` — [F] “four one zero”
+- `num_411.wav` — [F] “four one one”
+- `num_412.wav` — [F] “four one two”
+- `num_413.wav` — [F] “four one three”
+- `num_414.wav` — [F] “four one four”
+- `num_415.wav` — [F] “four one five”
+- `num_416.wav` — [F] “four one six”
+- `num_417.wav` — [F] “four one seven”
+- `num_418.wav` — [F] “four one eight”
+- `num_419.wav` — [F] “four one nine”
+- `num_420.wav` — [F] “four two zero”
+- `num_421.wav` — [F] “four two one”
+- `num_422.wav` — [F] “four two two”
+- `num_423.wav` — [F] “four two three”
+- `num_424.wav` — [F] “four two four”
+- `num_425.wav` — [F] “four two five”
+- `num_426.wav` — [F] “four two six”
+- `num_427.wav` — [F] “four two seven”
+- `num_428.wav` — [F] “four two eight”
+- `num_429.wav` — [F] “four two nine”
+- `num_430.wav` — [F] “four three zero”
+- `num_431.wav` — [F] “four three one”
+- `num_432.wav` — [F] “four three two”
+- `num_433.wav` — [F] “four three three”
+- `num_434.wav` — [F] “four three four”
+- `num_435.wav` — [F] “four three five”
+- `num_436.wav` — [F] “four three six”
+- `num_437.wav` — [F] “four three seven”
+- `num_438.wav` — [F] “four three eight”
+- `num_439.wav` — [F] “four three nine”
+- `num_440.wav` — [F] “four four zero”
+- `num_441.wav` — [F] “four four one”
+- `num_442.wav` — [F] “four four two”
+- `num_443.wav` — [F] “four four three”
+- `num_444.wav` — [F] “four four four”
+- `num_445.wav` — [F] “four four five”
+- `num_446.wav` — [F] “four four six”
+- `num_447.wav` — [F] “four four seven”
+- `num_448.wav` — [F] “four four eight”
+- `num_449.wav` — [F] “four four nine”
+- `num_450.wav` — [F] “four five zero”
+- `num_451.wav` — [F] “four five one”
+- `num_452.wav` — [F] “four five two”
+- `num_453.wav` — [F] “four five three”
+- `num_454.wav` — [F] “four five four”
+- `num_455.wav` — [F] “four five five”
+- `num_456.wav` — [F] “four five six”
 - `num_elim.wav` — [F] “has been eliminated.”
 - `num_elim_plural.wav` — [F] “have been eliminated.”

@@ -1226,7 +1226,15 @@ namespace Eliminated.Game.UI
             var descSt = new GUIStyle(_body) { fontSize = 12, wordWrap = true, normal = { textColor = Alpha(Ink, 0.82f) } };
             var ctrlTxtSt = new GUIStyle(_body) { fontSize = 12, wordWrap = true, normal = { textColor = Ink } };
 
-            float gap = 14f, cardW = 250f, modeH = 122f;
+            float gap = 14f, cardW = 250f;
+            // Mode cards size to the taller of the two blurbs — Hardcore now carries the
+            // Marble-forfeit rule, so a fixed height would clip it on narrow windows.
+            float modeHalf = (cw - 14f) / 2f;
+            var modeBodySt = new GUIStyle(_body) { fontSize = 13, wordWrap = true };
+            float modeBodyH = Mathf.Max(
+                modeBodySt.CalcHeight(new GUIContent(MenuContent.HardcoreRule), modeHalf - 32f),
+                modeBodySt.CalcHeight(new GUIContent(MenuContent.CasualRule), modeHalf - 32f));
+            float modeH = Mathf.Max(122f, modeBodyH + 56f);
             int cols = Mathf.Max(1, Mathf.FloorToInt((cw + gap) / (cardW + gap)));
             int rows = Mathf.CeilToInt(ids.Count / (float)cols);
 
@@ -1244,7 +1252,7 @@ namespace Eliminated.Game.UI
             _htpScroll = GUI.BeginScrollView(new Rect(vx, vtop, vw, vh), _htpScroll, new Rect(0, 0, cw, contentH));
             float y = Para(0, 0, cw, MenuContent.HowToPlayIntro, bodyP) + 16f;
 
-            float half = (cw - 14f) / 2f;
+            float half = modeHalf;
             ModeCard(new Rect(0, y, half, modeH), "💀 " + Loc.Get("ui.hardcore"), MenuContent.HardcoreRule, Red);
             ModeCard(new Rect(half + 14f, y, half, modeH), "🩹 " + Loc.Get("ui.casual"), MenuContent.CasualRule, Green);
             y += modeH + 28f;
@@ -1647,6 +1655,20 @@ namespace Eliminated.Game.UI
         {
             if (prof.equipped == null) return;
             var fit = thumb.Has ? FitAspect(pr, thumb.Aspect) : pr;
+            // Detected eyes anchor the face for EVERY character. Blob characters (no real Face/Head part)
+            // have a loose default head box that mis-places the hat & collar on both axes, so for them
+            // those slots anchor to the eye midpoint (Norm, flip-applied) instead — passed to AccPreviewRect.
+            Vector2 feL = default, feR = default; float feRad = 0f; bool feTight = true;
+            bool hasEyes = thumb.Has && CharacterArt.TryEyes(prof.characterId, out feL, out feR, out feRad, out feTight);
+            Vector2? eyeMidNorm = null;
+            if (hasEyes)
+            {
+                Vector2 emF = (feL + feR) * 0.5f;
+                float emx = thumb.FaceRect.x + emF.x * thumb.FaceRect.width;
+                float emy = thumb.FaceRect.y + emF.y * thumb.FaceRect.height;
+                if (thumb.Flip) emx = 1f - emx;
+                eyeMidNorm = new Vector2(emx, emy);
+            }
             foreach (var slot in Cosmetics.Slots)
             {
                 var id = prof.equipped.FirstOrDefault(e => Cosmetics.SlotOf(e) == slot);
@@ -1654,13 +1676,13 @@ namespace Eliminated.Game.UI
                 if (sp == null) continue;
                 // Glasses fit to the character's REAL eyes (a lens on each), tilted to match — the
                 // animals' eyes are wide-set and slightly uneven, so a flat centred sprite misses.
-                if (slot == "eyes" && thumb.Has && CharacterArt.TryEyes(prof.characterId, out var feL, out var feR, out var feRad, out var feTight))
+                if (slot == "eyes" && hasEyes)
                 {
                     if (id == "eyepatch") DrawSpannedEyewear(sp.texture, thumb, fit, feL, feR); // asymmetric: one patch + strap
                     else DrawFittedEyewear((AccessoryArt.GetLenses(id) ?? sp).texture, thumb, fit, feL, feR, feRad, feTight, prof.characterId == "clown" ? fit.width * 0.07f : 0f);             // two lenses, one per eye
                 }
                 else
-                    GUI.DrawTexture(AccPreviewRect(slot, fit, thumb, prof.characterId), sp.texture, ScaleMode.ScaleToFit, true);
+                    GUI.DrawTexture(AccPreviewRect(slot, fit, thumb, prof.characterId, eyeMidNorm, feTight), sp.texture, ScaleMode.ScaleToFit, true);
             }
 
             // TEMP DEBUG (remove after diagnosing): draw the runtime head box (yellow), face box
@@ -1769,8 +1791,12 @@ namespace Eliminated.Game.UI
         // on every player, whose head sits at a different spot/size in its thumbnail),
         // rather than a fixed fraction of the whole frame. `fit` is the aspect-fitted
         // thumbnail rect; `thumb.HeadRect` is the head in Norm space (0..1, Y-up).
-        private static Rect AccPreviewRect(string slot, Rect fit, CharacterPreview.Thumb thumb, string charId)
+        private static Rect AccPreviewRect(string slot, Rect fit, CharacterPreview.Thumb thumb, string charId,
+                                           Vector2? eyeMidNorm = null, bool tightFace = true)
         {
+            // Blob characters (no real face part) get their hat/collar anchored to the detected eyes,
+            // since their head/face box is a loose default that doesn't match the real face.
+            bool blobEye = eyeMidNorm.HasValue && !tightFace;
             var hr = thumb.Has ? thumb.HeadRect : new Rect(0.15f, 0.45f, 0.70f, 0.50f);
             // Anchor in screen space. When the art is mirrored (Flip), the head sits on the
             // mirrored side of the frame, so mirror the head box's X to match. Anchoring to
@@ -1800,12 +1826,26 @@ namespace Eliminated.Game.UI
                 // +0.094·s·aspect cancels that bias (aspect because the square sprite is sized by WIDTH).
                 // Cap the width: the MiMU animal rigs' head box is the whole-body silhouette (hw≈1), which
                 // gave a character-wide hat.
-                case "head": s = Mathf.Min(hw, 0.66f); ax = hcx; ay = htop - 0.06f + 0.094f * s * aspect; break;
+                case "head":
+                {
+                    s = Mathf.Min(hw, 0.66f);
+                    // Crown = head-box top, except blobs (loose box) anchor it ~0.29 above the eyes.
+                    float crown = blobEye ? Mathf.Min(eyeMidNorm.Value.y + 0.29f, 0.93f) : htop;
+                    ax = blobEye ? eyeMidNorm.Value.x : hcx;
+                    ay = crown - 0.06f + 0.094f * s * aspect; // seat the brim, not the sprite centre
+                    break;
+                }
                 case "eyes": ax = fcx;             ay = fr.y + fr.height * 0.62f; s = fr.width * 1.00f; break; // glasses fallback (no measured eyes, e.g. slime/humans): centred on the face
                 // Collar/bowtie at the neck — anchor to the FACE box (just below the chin), NOT the head
                 // box: the MiMU animal rigs name their whole-body silhouette "Head", so its bottom is at
                 // the FEET and its width is the whole character (collar ended up at the feet, huge).
-                case "neck": ax = fcx;             ay = fr.y - fr.height * 0.06f; s = fr.width * 0.85f; break;
+                // Blobs: just below the eyes (the loose face box puts the chin too low & off-centre,
+                // e.g. the banana's off-centre face). Real-face chars: just below the chin (face box bottom).
+                case "neck":
+                    ax = blobEye ? eyeMidNorm.Value.x : fcx;
+                    ay = blobEye ? eyeMidNorm.Value.y - 0.12f : fr.y - fr.height * 0.06f;
+                    s  = fr.width * 0.85f;
+                    break;
                 case "ear":
                     ax = hx + hw * 0.68f; ay = hr.y + hr.height * 0.69f; s = hw * 0.52f; // flower tucked beside the ear
                     // Per-character fixes where the generic spot lands wrong:
