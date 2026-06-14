@@ -4,13 +4,14 @@ using Eliminated.Sim.Model;
 namespace Eliminated.Game.Audio
 {
     /// <summary>
-    /// The Game Master's robotic PA voice. Maps in-game moments to the pre-rendered
-    /// announcer clip bank (Resources/Audio/voice, produced by tools/VoiceGen) and
-    /// plays them through <see cref="AudioService.Speak"/>. Mirrors the web build's
-    /// browser-TTS Game Master: a MALE announcer reveals each game and barks Simon
-    /// Says orders; a FEMALE voice calls eliminations. Unity has no speech synth, so
-    /// the clips are baked offline and stitched here (e.g. "Game three." + the game
-    /// name). Every call is a no-op when no <see cref="AudioService"/> exists.
+    /// The Game Master's PA voice. Maps in-game moments to the pre-rendered announcer
+    /// clip bank (Resources/Audio/voice, produced by tools/VoiceGen) and plays them
+    /// through <see cref="AudioService.Speak"/>. A single FEMALE voice runs the whole
+    /// PA — game reveals, Simon Says orders, and eliminations; a MALE Front Man voice
+    /// speaks only the lone victory call (<see cref="Winner"/>) on the champion screen.
+    /// Unity has no speech synth, so the clips are baked offline and stitched here
+    /// (e.g. "Game three." + the game name). Every call is a no-op when no
+    /// <see cref="AudioService"/> exists.
     /// </summary>
     public static class Announcer
     {
@@ -39,6 +40,11 @@ namespace Eliminated.Game.Audio
             if (!string.IsNullOrEmpty(room)) line.Add(Dir + "room_" + room);
             AudioService.Instance?.Speak(line, RevealVolume);
         }
+
+        /// <summary>The Front Man's victory call on the champion screen: "We have a winner."
+        /// The only line spoken by the male voice (the female PA handles everything else).
+        /// Fired once from <c>HudUi</c> when the series enters <c>SeriesResult</c>.</summary>
+        public static void Winner() => AudioService.Instance?.Speak(new[] { Dir + "winner" }, RevealVolume);
 
         /// <summary>Female elimination call, by the eliminated player's lobby tag: "Player five
         /// seven three has been eliminated." Each tag 1..456 is its OWN clip (read digit by digit

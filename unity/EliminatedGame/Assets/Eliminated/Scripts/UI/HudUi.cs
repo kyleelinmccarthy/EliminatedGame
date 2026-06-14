@@ -621,6 +621,7 @@ namespace Eliminated.Game.UI
                     var champ = _router.ChampionId;
                     if (!string.IsNullOrEmpty(champ)) Caption(Loc.Get("gm.champion", _router.NameOf(champ)), 8f);
                     AudioService.Instance?.Play("win");
+                    Announcer.Winner(); // the Front Man's lone male line: "We have a winner."
                     if (champ != null && _router.LocalPlayerIds.Contains(champ)) // a local player won the series
                     {
                         SteamService.Instance?.Unlock("SERIES_WIN");
@@ -1820,19 +1821,22 @@ namespace Eliminated.Game.UI
                 // box is inflated by ears/horns/tufts, so the old top-right corner (0.86/0.80)
                 // floated the flower off the head on most players. 0.68 across / 0.69 up tucks it
                 // beside the head for every character (bears, demons, cats, owls, cow, …).
-                // Hat on the crown. Seat the BRIM ~0.06 into the head top, not the sprite centre — the
-                // hat art lives in the upper half of its 128px canvas (brim at sprite-y52 ≈ 0.094 below
-                // centre), so anchoring the centre above the head left the brim floating above it. The
-                // +0.094·s·aspect cancels that bias (aspect because the square sprite is sized by WIDTH).
-                // Cap the width: the MiMU animal rigs' head box is the whole-body silhouette (hw≈1), which
-                // gave a character-wide hat.
+                // Hat on the crown. The hat art lives in the upper half of its 128px canvas (brim at
+                // sprite-y52 ≈ 0.094 below centre), so the +0.094·s·aspect seats the BRIM (not the sprite
+                // centre) on the crown (aspect because the square sprite is sized by WIDTH). Cap the width:
+                // the MiMU animal rigs' head box is the whole-body silhouette (hw≈1), which gave a
+                // character-wide hat. Crown = a blend between the eyes and the head-box top: the box top is
+                // the ear-TIP top for eared animals (cat/bear/koala), so anchoring there perched the hat
+                // above the ears — blending 70% toward the top drops it onto the head so the ears poke up,
+                // while high-eyed faces (owl/cow) still land near the top. Falls back to the top with no eyes.
                 case "head":
                 {
                     s = Mathf.Min(hw, 0.66f);
-                    // Crown = head-box top, except blobs (loose box) anchor it ~0.29 above the eyes.
-                    float crown = blobEye ? Mathf.Min(eyeMidNorm.Value.y + 0.29f, 0.93f) : htop;
+                    float crown = eyeMidNorm.HasValue
+                        ? eyeMidNorm.Value.y + (htop - eyeMidNorm.Value.y) * 0.70f
+                        : htop - 0.06f;
                     ax = blobEye ? eyeMidNorm.Value.x : hcx;
-                    ay = crown - 0.06f + 0.094f * s * aspect; // seat the brim, not the sprite centre
+                    ay = crown + 0.094f * s * aspect;
                     break;
                 }
                 case "eyes": ax = fcx;             ay = fr.y + fr.height * 0.62f; s = fr.width * 1.00f; break; // glasses fallback (no measured eyes, e.g. slime/humans): centred on the face

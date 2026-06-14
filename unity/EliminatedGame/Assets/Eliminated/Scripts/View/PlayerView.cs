@@ -405,9 +405,18 @@ namespace Eliminated.Game.View
             switch (slot)
             {
                 // Hat on the crown. The hat art sits in the upper half of its sprite (brim ≈ 0.094 below
-                // centre), so seat the brim ~0.05·w into the head top instead of floating the centre above
-                // it. Cap the width — the MiMU rigs' "Head" is the whole-body silhouette (w = full width).
-                case "head": scale = w * 0.66f; pos = new Vector3(cx, top - w * 0.05f + 0.094f * scale, z); break;
+                // centre), so seat the brim (not the centre) on the crown. Crown = a blend between the face
+                // centre (≈ eye level) and the head top: the head box top is the ear-TIP top for eared
+                // animals (cat/bear), so seating there perched the hat above the ears — blending toward the
+                // top drops it onto the head so the ears poke up. Cap the width (MiMU "Head" = full body).
+                case "head":
+                {
+                    var fc = (_faceR != null ? _faceR : hr).bounds;
+                    float crownY = fc.center.y + (top - fc.center.y) * 0.70f;
+                    scale = w * 0.66f;
+                    pos = new Vector3(cx, crownY + 0.094f * scale, z);
+                    break;
+                }
                 case "eyes": pos = new Vector3(cx, bot + hgt * 0.55f, z); scale = w * 0.62f; break; // glasses centred (no eye data)
                 case "neck": // collar at the neck — anchor to the FACE renderer (just below the chin),
                 {            // NOT the head box: the MiMU rigs name the whole-body silhouette "Head".

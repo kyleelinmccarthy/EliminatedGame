@@ -119,29 +119,35 @@ output and carry no third-party license (see `Resources/Audio/SFX_MANIFEST.md`).
 
 ## Game Master announcer voice (shipped — generated offline, no runtime dependency)
 
-The web build's robotic Game Master (`lib/client/audio.ts` → browser
-`speechSynthesis`) — a **male** announcer revealing each game and barking Simon
-Says orders, a **female** voice calling eliminations — is reproduced for Unity,
-which has no built-in speech synth. Instead of speaking at runtime we pre-render a
-small fixed vocabulary **once** with **Piper** (neural TTS) and ship the 67 clips
-under `Resources/Audio/voice/`. The shipped voices are **CC0 / public-domain**
-models so they are safe for a commercial build: male announcer = **`norman`**
-(public domain), female (eliminations) = **`ljspeech`** (public domain). At runtime
-`Announcer` stitches them — e.g. `game_03` + `name_tugofwar` = "Game three. Tug of
-war." — and `AudioService.Speak` plays them gaplessly on a dedicated voice pool.
-Regenerate by pointing the env vars at a Piper binary + the two `.onnx` voices:
+The web build's Game Master (`lib/client/audio.ts` → browser `speechSynthesis`) is
+reproduced for Unity, which has no built-in speech synth. Instead of speaking at
+runtime we pre-render a fixed vocabulary **once** with **Kokoro** (neural TTS) and
+ship the 514 clips under `Resources/Audio/voice/`. Voice split:
+
+- **PA announcer = a single female voice `af_kore`** — game reveals, Simon Says
+  orders, *and* eliminations (the whole PA).
+- **Front Man = the male voice `am_adam`**, which speaks the **one** ceremonial
+  victory line (`winner.wav`, "We have a winner.") on the champion screen.
+
+At runtime `Announcer` stitches the clips — e.g. `game_03` + `name_tugofwar` =
+"Game three. Tug of war." — and `AudioService.Speak` plays them gaplessly on a
+dedicated voice pool. **All Kokoro voices are Apache-2.0**, so the rendered WAVs are
+safe to ship commercially. The clip vocabulary (text + voice tag) lives in
+`tools/VoiceGen` (C#); the Kokoro renderer reads it via `--dump-specs` so there is
+one source of truth. Regenerate:
 
 ```bash
-PIPER_BIN=… PIPER_MALE=…/norman.onnx PIPER_FEMALE=…/en_US-ljspeech-medium.onnx \
-  dotnet run --project tools/VoiceGen -- unity/EliminatedGame/Assets/Eliminated/Resources/Audio/voice
+dotnet run --project tools/VoiceGen -- --dump-specs > /tmp/specs.tsv
+python3 tools/VoiceGen/kokoro_bank.py /tmp/specs.tsv unity/EliminatedGame/Assets/Eliminated/Resources/Audio/voice
 ```
 
-(`espeak-ng` is the no-env fallback engine — robotic formant synth — when those
-vars are unset.) The TTS engine is a **build-time tool only** — not a runtime or
-Unity dependency. Speech-synth output is the user's own data, not a derivative of
-the synthesizer; only ship CC0 / public-domain voice models (NOT the CC BY-NC ones
-like `ryan`/`hfc`/`lessac`). See `Resources/Audio/voice/VOICE_MANIFEST.md`. The
-finale reveal ("The final game. …")
+(Kokoro needs `pip install kokoro-onnx` + the `kokoro-v1.0.onnx` / `voices-v1.0.bin`
+model files — build-time only. Override voices with `KOKORO_ANNOUNCER` /
+`KOKORO_WINNER`. `tools/VoiceGen` also still has a **Piper/espeak** fallback path for
+a robotic bank when the Kokoro deps are absent.) The TTS engine is a **build-time
+tool only** — not a runtime or Unity dependency; speech-synth output is the user's
+own data, not a derivative of the synthesizer. See
+`Resources/Audio/voice/VOICE_MANIFEST.md`. The finale reveal ("The final game. …")
 fires online too — the server sends a mystery-safe `finalGame` flag in the room
 message (see the finale-music note below).
 

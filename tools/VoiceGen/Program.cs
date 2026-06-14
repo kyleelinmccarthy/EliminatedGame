@@ -35,10 +35,23 @@ namespace Eliminated.Tools.VoiceGen
         private static bool PiperReady =>
             !string.IsNullOrEmpty(PiperBin) && File.Exists(PiperMale ?? "") && File.Exists(PiperFemale ?? "");
 
-        private enum V { Male, Female }
+        // Male = legacy/fallback male slot, Female = the PA announcer (reveals, Simon, eliminations),
+        // Winner = the lone male Front Man line on the champion screen. The shipped bank renders
+        // Female + Male as the female announcer and Winner as the male voice (see kokoro_bank.py).
+        private enum V { Male, Female, Winner }
 
         public static int Main(string[] args)
         {
+            // --dump-specs: print the clip vocabulary as TSV (key<TAB>text<TAB>M|F|W) and exit,
+            // for the Kokoro renderer (kokoro_bank.py) — keeps this spec list the single source
+            // of the bank's text + voice assignments. No TTS engine needed.
+            if (args.Length > 0 && args[0] == "--dump-specs")
+            {
+                foreach (var c in BuildSpecs())
+                    Console.WriteLine($"{c.Key}\t{c.Text}\t{(c.Voice == V.Female ? "F" : c.Voice == V.Winner ? "W" : "M")}");
+                return 0;
+            }
+
             string outDir = args.Length > 0
                 ? args[0]
                 : Path.Combine("..", "..", "unity", "EliminatedGame", "Assets", "Eliminated", "Resources", "Audio", "voice");
@@ -66,7 +79,7 @@ namespace Eliminated.Tools.VoiceGen
                 if (Render(c.Voice, c.Text, path, out string err))
                 {
                     ok++;
-                    Console.WriteLine($"  wrote {c.Key}.wav  [{(c.Voice == V.Male ? "M" : "F")}]  \"{c.Text}\"");
+                    Console.WriteLine($"  wrote {c.Key}.wav  [{(c.Voice == V.Female ? "F" : c.Voice == V.Winner ? "W" : "M")}]  \"{c.Text}\"");
                 }
                 else
                 {
@@ -181,6 +194,12 @@ namespace Eliminated.Tools.VoiceGen
             list.Add(new Spec("num_elim", "has been eliminated.", V.Female));
             list.Add(new Spec("num_elim_plural", "have been eliminated.", V.Female));
 
+            // --- Male Front Man: the ONE male line ----------------------------------
+            // Spoken once on the champion screen (HudUi SeriesResult → Announcer.Winner).
+            // Everything above is the female PA announcer; this lone ceremonial victory
+            // call is the only thing the male voice says.
+            list.Add(new Spec("winner", "We have a winner.", V.Winner));
+
             return list;
         }
 
@@ -210,7 +229,7 @@ namespace Eliminated.Tools.VoiceGen
             string tmp = Path.GetTempFileName();
             try
             {
-                string model = voice == V.Male ? PiperMale : PiperFemale;
+                string model = voice == V.Female ? PiperFemale : PiperMale;
                 var psi = new ProcessStartInfo
                 {
                     FileName = PiperBin,
@@ -249,9 +268,9 @@ namespace Eliminated.Tools.VoiceGen
             try
             {
                 File.WriteAllText(txt, text);
-                string vname = voice == V.Male ? MaleVoice : FemaleVoice;
-                int rate = voice == V.Male ? MaleRate : FemaleRate;
-                int pitch = voice == V.Male ? MalePitch : FemalePitch;
+                string vname = voice == V.Female ? FemaleVoice : MaleVoice;
+                int rate = voice == V.Female ? FemaleRate : MaleRate;
+                int pitch = voice == V.Female ? FemalePitch : MalePitch;
                 // -z drops the trailing sentence pause; -f reads text from a file so
                 // punctuation/quoting never reaches a shell.
                 var argv = new[]
@@ -430,7 +449,7 @@ namespace Eliminated.Tools.VoiceGen
             sw.WriteLine("16-bit PCM mono WAV. **M** = male announcer (game reveals + Simon Says), **F** = female (eliminations).");
             sw.WriteLine();
             foreach (var c in clips)
-                sw.WriteLine($"- `{c.Key}.wav` — [{(c.Voice == V.Male ? "M" : "F")}] “{c.Text}”");
+                sw.WriteLine($"- `{c.Key}.wav` — [{(c.Voice == V.Female ? "F" : c.Voice == V.Winner ? "W" : "M")}] “{c.Text}”");
         }
     }
 }
